@@ -26,7 +26,7 @@ bot.command("start", async (ctx) => {
     await ctx.reply(
         `👋 Salom, <b>${user.first_name || "Do'stim"}</b>!\n\n` +
         `🏦 <b>Hisobla Bot</b> (Supabase Edge Function + AI) ga xush kelibsiz!\n\n` +
-        `Har qanday matnni menga yozishingiz mumkin (masalan: <i>"taksi 15000"</i>, <i>"oylik 3 mln"</i>, <i>"Ali ga 100$ berdim"</i> yoki shunchaki moliyaviy savollaringizni bering).`,
+        `Har qanday matnni menga yozishingiz mumkin (masalan: <i>"10 ming taksiga ishlatdim"</i>, <i>"oylik 3 mln"</i>, <i>"Ali ga 100$ berdim"</i>).`,
         { parse_mode: "HTML", reply_markup: kb }
     );
 });
@@ -61,7 +61,7 @@ bot.command("qarzlar", async (ctx) => {
     await handleDebtsList(ctx);
 });
 
-// EVERY text message is passed to Groq AI
+// EVERY text message is passed to Groq AI + Local Fallback
 bot.on("message:text", async (ctx) => {
     const text = ctx.message.text;
     if (text.startsWith("/")) return;
@@ -90,10 +90,9 @@ bot.on("message:text", async (ctx) => {
     } else if (parsed.intent === "debts_list") {
         await handleDebtsList(ctx);
     } else if (parsed.reply) {
-        // Groq AI natural language reply
-        await ctx.reply(`🤖 ${parsed.reply}`, { parse_mode: "HTML" });
+        await ctx.reply(parsed.reply, { parse_mode: "HTML" });
     } else {
-        await ctx.reply("🤖 Tushundim! Moliyangizni boshqarishda yordam berishim mumkin.");
+        await ctx.reply("🤖 Tushundim! Xarajat yoki daromadingizni kiritishingiz mumkin.");
     }
 });
 

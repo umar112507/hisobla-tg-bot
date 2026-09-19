@@ -16,114 +16,171 @@ Mavjud kategoriyalar: ${categories.join(", ")}
 Faqat mos kategoriya nomini qaytaring. JSON: {"category": "Kategoriya"}`;
 
     try {
-        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${GROQ_API_KEY}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                model: "llama3-70b-8192",
-                messages: [{ role: "user", content: prompt }],
-                temperature: 0.1,
-                max_tokens: 50,
-            }),
-        });
-        const data = await res.json();
-        const content = data.choices?.[0]?.message?.content || "";
-        const match = content.match(/\{.*?\}/s);
-        if (match) {
-            const parsed = JSON.parse(match[0]);
-            if (categories.includes(parsed.category)) return parsed.category;
+        if (GROQ_API_KEY) {
+            const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${GROQ_API_KEY}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    model: "llama3-70b-8192",
+                    messages: [{ role: "user", content: prompt }],
+                    temperature: 0.1,
+                    max_tokens: 50,
+                }),
+            });
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content || "";
+            const match = content.match(/\{.*?\}/s);
+            if (match) {
+                const parsed = JSON.parse(match[0]);
+                if (categories.includes(parsed.category)) return parsed.category;
+            }
         }
     } catch (e) {
         console.error("Groq categorize error:", e);
     }
+
+    // Fallback keyword categorizer
+    const descLower = description.toLowerCase();
+    if (/taksi|avto|benzin|metan|propan|yo'l|bus|bus/i.test(descLower)) return "Transport";
+    if (/ovqat|tushlik|non|go'sht|osh|kafe|restoran|do'kon|bozor/i.test(descLower)) return "Ovqat";
+    if (/uy|ijara|arenda|remont/i.test(descLower)) return "Uy";
+    if (/apteka|dori|vrach|shifokor/i.test(descLower)) return "Salomatlik";
+    if (/kurs|maktab|univer|kitob/i.test(descLower)) return "Ta'lim";
+    if (/kino|o'yin|park|konsert/i.test(descLower)) return "Ko'ngil ochar";
+    if (/svet|gaz|suv|musor/i.test(descLower)) return "Kommunal";
+    if (/payme|click|uzum|tarif|paket|internet|telefon/i.test(descLower)) return "Telefon/Internet";
+    if (/maosh|oylik|zarplata/i.test(descLower)) return "Maosh";
     return "Boshqa";
 }
 
 export async function parseIntent(text: string, summaryContext?: any) {
-    const prompt = `Siz "Hisobla" botining aqlli AI moliyaviy yordamchisiz.
-Foydalanuvchi yozgan har qanday matnni chuqur tahlil qiling va tegishli harakatni anilashing.
+    const prompt = `Siz "Hisobla" botining moliyaviy AI yordamchisiz.
+Matnni tahlil qiling va SUMMA VA TAVSIFNI aniqlang.
+
+MUHIM SO'Z SHAKLLARI:
+- "ming" / "k" = 000 (masalan: "10 ming" -> 10000, "50k" -> 50000)
+- "mln" / "million" = 000000 (masalan: "2 mln" -> 2000000, "1.5 million" -> 1500000)
+- "dollor" / "$" / "usd" = 13000 ga ko'paytirilsin (masalan: "10$" -> 130000)
 
 Matn: "${text}"
-Foydalanuvchi joriy balansi: ${summaryContext ? `${summaryContext.balance} so'm (Daromad: ${summaryContext.totalIncome}, Xarajat: ${summaryContext.totalExpense})` : "Noma'lum"}
 
-Ixtiyoriy matn uchun JSON qaytaring:
-1. Xarajat kiritilsa (masalan: "taksi 15000", "tushlikka 25 ming ketdi", "do'kondan 100 mingga narsa oldim"):
+JSON qaytaring:
+1. Xarajat bo'lsa (masalan: "10 ming taksiga ishlatdim", "ovqatga 25000 ketdi", "taksi 15000"):
 {
   "intent": "expense",
-  "amount": 15000,
+  "amount": 10000,
   "description": "taksi"
 }
 
-2. Daromad kiritilsa (masalan: "oylik tushdi 3 mln", "500$ berishdi", "freelancedan 200$ oldim"):
+2. Daromad bo'lsa (masalan: "oylik tushdi 3 mln", "500000 oldim"):
 {
   "intent": "income",
   "amount": 3000000,
   "description": "oylik"
 }
 
-3. Qarz berilsa (masalan: "Ali ga 500000 qarz berdim", "Sardor 100 ming oldi"):
+3. Qarz berilsa (masalan: "Ali ga 500000 qarz berdim"):
 {
   "intent": "debt_gave",
   "person": "Ali",
-  "amount": 500000,
-  "due_date": "YYYY-MM-DD yoki null"
+  "amount": 500000
 }
 
 4. Qarz olinsa (masalan: "Validan 200 ming qarz oldim"):
 {
   "intent": "debt_received",
   "person": "Vali",
-  "amount": 200000,
-  "due_date": "YYYY-MM-DD yoki null"
+  "amount": 200000
 }
 
-5. Hisobot yoki balans so'ralsa:
-{
-  "intent": "report"
-}
+5. Hisobot bo'lsa: {"intent": "report"}
+6. Qarzlar bo'lsa: {"intent": "debts_list"}
 
-6. Qarzlar ro'yxati so'ralsa:
-{
-  "intent": "debts_list"
-}
-
-7. Oddiy muloqot, savol, maslahat yoki tushunarsiz ibora bo'lsa (AI xuddi samimiy moliyaviy maslahatchi kabi o'zbek tilida javob berishi kerak):
+7. Aks holda suhbat javobi:
 {
   "intent": "ai_reply",
-  "reply": "Samimiy, do'stona va foydali AI javobi matni..."
+  "reply": "Samimiy javob matni..."
 }
 
-Faqat valid JSON qaytaring. Izoh yozmang.`;
+Faqat JSON qaytaring.`;
 
     try {
-        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${GROQ_API_KEY}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                model: "llama3-70b-8192",
-                messages: [{ role: "user", content: prompt }],
-                temperature: 0.3,
-                max_tokens: 300,
-            }),
-        });
-        const data = await res.json();
-        const content = data.choices?.[0]?.message?.content || "";
-        const match = content.match(/\{.*?\}/s);
-        if (match) {
-            return JSON.parse(match[0]);
+        if (GROQ_API_KEY) {
+            const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${GROQ_API_KEY}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    model: "llama3-70b-8192",
+                    messages: [{ role: "user", content: prompt }],
+                    temperature: 0.1,
+                    max_tokens: 250,
+                }),
+            });
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content || "";
+            const match = content.match(/\{.*?\}/s);
+            if (match) {
+                const parsed = JSON.parse(match[0]);
+                if (parsed.intent) return parsed;
+            }
         }
     } catch (e) {
         console.error("Groq intent error:", e);
     }
 
+    // Smart local regex fallback if Groq API fails or key is missing
+    return fallbackRegexParser(text);
+}
+
+function fallbackRegexParser(text: string) {
+    const lower = text.toLowerCase();
+
+    // Parse amount with "ming", "mln", "k"
+    let amount: number | null = null;
+
+    const mlnMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:mln|million)/);
+    if (mlnMatch) {
+        amount = parseFloat(mlnMatch[1]) * 1000000;
+    }
+
+    if (!amount) {
+        const mingMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:ming|k)/);
+        if (mingMatch) {
+            amount = parseFloat(mingMatch[1]) * 1000;
+        }
+    }
+
+    if (!amount) {
+        const digitMatch = lower.match(/\b\d{3,9}\b/);
+        if (digitMatch) {
+            amount = parseFloat(digitMatch[0]);
+        }
+    }
+
+    if (amount) {
+        // Determine if income or expense
+        if (/ishlatdim|ketdi|berdim|berdim|sarfladim|taksi|ovqat|bozor|do'kon|tushlik|taksi/i.test(lower)) {
+            const desc = text.replace(/(\d+[\d\s\.]*)\s*(?:ming|k|mln|million|so'm)?/gi, "").replace(/ishlatdim|ketdi|sarfladim/gi, "").trim();
+            return { intent: "expense", amount, description: desc || text };
+        }
+        if (/tushdi|oldim|keldi|ishladim|daromad|maosh/i.test(lower)) {
+            const desc = text.replace(/(\d+[\d\s\.]*)\s*(?:ming|k|mln|million|so'm)?/gi, "").replace(/tushdi|oldim|keldi/gi, "").trim();
+            return { intent: "income", amount, description: desc || text };
+        }
+        return { intent: "expense", amount, description: text };
+    }
+
+    if (/hisobot|balans|statistika/i.test(lower)) return { intent: "report" };
+    if (/qarzlar|qarzlarim/i.test(lower)) return { intent: "debts_list" };
+
     return {
         intent: "ai_reply",
-        reply: "🤖 Qiziq fikr! Men sizga xarajat va daromadlarni yozib borishda, qarzlaringizni nazorat qilishda va balansingizni hisoblashda yordam bera olaman."
+        reply: "🤖 Tushundim! Xarajat yoki daromadingizni yozishingiz mumkin (masalan: <i>10 ming taksi</i> yoki <i>2 mln oylik</i>)."
     };
 }
