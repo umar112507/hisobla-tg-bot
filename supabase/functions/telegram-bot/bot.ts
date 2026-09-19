@@ -25,8 +25,8 @@ bot.command("start", async (ctx) => {
 
     await ctx.reply(
         `👋 Salom, <b>${user.first_name || "Do'stim"}</b>!\n\n` +
-        `🏦 <b>Hisobla Bot</b> (Supabase Edge Function) ga xush kelibsiz!\n\n` +
-        `Matn shaklida yozishingiz mumkin (masalan: <i>taksi 15000</i>).`,
+        `🏦 <b>Hisobla Bot</b> (Supabase Edge Function + AI) ga xush kelibsiz!\n\n` +
+        `Har qanday matnni menga yozishingiz mumkin (masalan: <i>"taksi 15000"</i>, <i>"oylik 3 mln"</i>, <i>"Ali ga 100$ berdim"</i> yoki shunchaki moliyaviy savollaringizni bering).`,
         { parse_mode: "HTML", reply_markup: kb }
     );
 });
@@ -61,7 +61,7 @@ bot.command("qarzlar", async (ctx) => {
     await handleDebtsList(ctx);
 });
 
-// Plain text / Natural Language handler
+// EVERY text message is passed to Groq AI
 bot.on("message:text", async (ctx) => {
     const text = ctx.message.text;
     if (text.startsWith("/")) return;
@@ -69,7 +69,11 @@ bot.on("message:text", async (ctx) => {
     const user = ctx.from;
     await ensureUser(user.id, user.username, user.first_name);
 
-    const parsed = await parseIntent(text);
+    // Send typing chat action
+    await ctx.replyWithChatAction("typing");
+
+    const summary = await getSummary(user.id);
+    const parsed = await parseIntent(text, summary);
 
     if (parsed.intent === "expense" && parsed.amount) {
         await handleExpense(ctx, `${parsed.amount} ${parsed.description || text}`);
@@ -77,23 +81,19 @@ bot.on("message:text", async (ctx) => {
         await handleIncome(ctx, `${parsed.amount} ${parsed.description || text}`);
     } else if (parsed.intent === "debt_gave" && parsed.person && parsed.amount) {
         await addDebt(user.id, "gave", parsed.person, Number(parsed.amount), text, parsed.due_date);
-        await ctx.reply(`📤 <b>Qarz berganingiz saqlandi!</b>\n\n👤 ${parsed.person}: ${parsed.amount} so'm`, { parse_mode: "HTML" });
+        await ctx.reply(`📤 <b>Qarz berganingiz saqlandi!</b>\n\n👤 <b>Kim:</b> ${parsed.person}\n💵 <b>Miqdor:</b> ${Number(parsed.amount).toLocaleString()} so'm`, { parse_mode: "HTML" });
     } else if (parsed.intent === "debt_received" && parsed.person && parsed.amount) {
         await addDebt(user.id, "received", parsed.person, Number(parsed.amount), text, parsed.due_date);
-        await ctx.reply(`📥 <b>Qarz olganingiz saqlandi!</b>\n\n👤 ${parsed.person}: ${parsed.amount} so'm`, { parse_mode: "HTML" });
+        await ctx.reply(`📥 <b>Qarz olganingiz saqlandi!</b>\n\n👤 <b>Kim:</b> ${parsed.person}\n💵 <b>Miqdor:</b> ${Number(parsed.amount).toLocaleString()} so'm`, { parse_mode: "HTML" });
     } else if (parsed.intent === "report") {
         await handleReport(ctx);
     } else if (parsed.intent === "debts_list") {
         await handleDebtsList(ctx);
+    } else if (parsed.reply) {
+        // Groq AI natural language reply
+        await ctx.reply(`🤖 ${parsed.reply}`, { parse_mode: "HTML" });
     } else {
-        await ctx.reply(
-            "🤖 Tushunmadim. Misollar:\n" +
-            "• <code>taksi 15000</code>\n" +
-            "• <code>maosh 2000000</code>\n" +
-            "• <code>Ali ga 500000 berdim</code>\n" +
-            "• <code>hisobot</code>",
-            { parse_mode: "HTML" }
-        );
+        await ctx.reply("🤖 Tushundim! Moliyangizni boshqarishda yordam berishim mumkin.");
     }
 });
 

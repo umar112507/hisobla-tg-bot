@@ -42,16 +42,61 @@ Faqat mos kategoriya nomini qaytaring. JSON: {"category": "Kategoriya"}`;
     return "Boshqa";
 }
 
-export async function parseIntent(text: string) {
-    const prompt = `Matn: "${text}"
-Foydalanuvchi matnini tahlil qil va JSON qaytar:
+export async function parseIntent(text: string, summaryContext?: any) {
+    const prompt = `Siz "Hisobla" botining aqlli AI moliyaviy yordamchisiz.
+Foydalanuvchi yozgan har qanday matnni chuqur tahlil qiling va tegishli harakatni anilashing.
+
+Matn: "${text}"
+Foydalanuvchi joriy balansi: ${summaryContext ? `${summaryContext.balance} so'm (Daromad: ${summaryContext.totalIncome}, Xarajat: ${summaryContext.totalExpense})` : "Noma'lum"}
+
+Ixtiyoriy matn uchun JSON qaytaring:
+1. Xarajat kiritilsa (masalan: "taksi 15000", "tushlikka 25 ming ketdi", "do'kondan 100 mingga narsa oldim"):
 {
-  "intent": "expense|income|debt_gave|debt_received|report|debts_list|unknown",
-  "amount": raqam_yoki_null,
-  "description": "tavsif_yoki_null",
-  "person": "ism_yoki_null",
-  "due_date": "YYYY-MM-DD_yoki_null"
-}`;
+  "intent": "expense",
+  "amount": 15000,
+  "description": "taksi"
+}
+
+2. Daromad kiritilsa (masalan: "oylik tushdi 3 mln", "500$ berishdi", "freelancedan 200$ oldim"):
+{
+  "intent": "income",
+  "amount": 3000000,
+  "description": "oylik"
+}
+
+3. Qarz berilsa (masalan: "Ali ga 500000 qarz berdim", "Sardor 100 ming oldi"):
+{
+  "intent": "debt_gave",
+  "person": "Ali",
+  "amount": 500000,
+  "due_date": "YYYY-MM-DD yoki null"
+}
+
+4. Qarz olinsa (masalan: "Validan 200 ming qarz oldim"):
+{
+  "intent": "debt_received",
+  "person": "Vali",
+  "amount": 200000,
+  "due_date": "YYYY-MM-DD yoki null"
+}
+
+5. Hisobot yoki balans so'ralsa:
+{
+  "intent": "report"
+}
+
+6. Qarzlar ro'yxati so'ralsa:
+{
+  "intent": "debts_list"
+}
+
+7. Oddiy muloqot, savol, maslahat yoki tushunarsiz ibora bo'lsa (AI xuddi samimiy moliyaviy maslahatchi kabi o'zbek tilida javob berishi kerak):
+{
+  "intent": "ai_reply",
+  "reply": "Samimiy, do'stona va foydali AI javobi matni..."
+}
+
+Faqat valid JSON qaytaring. Izoh yozmang.`;
 
     try {
         const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -63,8 +108,8 @@ Foydalanuvchi matnini tahlil qil va JSON qaytar:
             body: JSON.stringify({
                 model: "llama3-70b-8192",
                 messages: [{ role: "user", content: prompt }],
-                temperature: 0,
-                max_tokens: 120,
+                temperature: 0.3,
+                max_tokens: 300,
             }),
         });
         const data = await res.json();
@@ -76,5 +121,9 @@ Foydalanuvchi matnini tahlil qil va JSON qaytar:
     } catch (e) {
         console.error("Groq intent error:", e);
     }
-    return { intent: "unknown" };
+
+    return {
+        intent: "ai_reply",
+        reply: "🤖 Qiziq fikr! Men sizga xarajat va daromadlarni yozib borishda, qarzlaringizni nazorat qilishda va balansingizni hisoblashda yordam bera olaman."
+    };
 }
