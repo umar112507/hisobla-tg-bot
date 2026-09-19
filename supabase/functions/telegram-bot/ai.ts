@@ -44,7 +44,9 @@ Faqat mos kategoriya nomini qaytaring. JSON: {"category": "Kategoriya"}`;
 
     // Fallback keyword categorizer
     const descLower = description.toLowerCase();
-    if (/taksi|avto|benzin|metan|propan|yo'l|bus|bus/i.test(descLower)) return "Transport";
+    if (/oylik|maosh|zarplata|avans|ishhaqi|stipendiya/i.test(descLower)) return "Maosh";
+    if (/biznes|foyda|sotuv/i.test(descLower)) return "Biznes";
+    if (/taksi|avto|benzin|metan|propan|yo'l|bus/i.test(descLower)) return "Transport";
     if (/ovqat|tushlik|non|go'sht|osh|kafe|restoran|do'kon|bozor/i.test(descLower)) return "Ovqat";
     if (/uy|ijara|arenda|remont/i.test(descLower)) return "Uy";
     if (/apteka|dori|vrach|shifokor/i.test(descLower)) return "Salomatlik";
@@ -52,60 +54,44 @@ Faqat mos kategoriya nomini qaytaring. JSON: {"category": "Kategoriya"}`;
     if (/kino|o'yin|park|konsert/i.test(descLower)) return "Ko'ngil ochar";
     if (/svet|gaz|suv|musor/i.test(descLower)) return "Kommunal";
     if (/payme|click|uzum|tarif|paket|internet|telefon/i.test(descLower)) return "Telefon/Internet";
-    if (/maosh|oylik|zarplata/i.test(descLower)) return "Maosh";
     return "Boshqa";
 }
 
 export async function parseIntent(text: string, summaryContext?: any) {
     const prompt = `Siz "Hisobla" botining moliyaviy AI yordamchisiz.
-Matnni tahlil qiling va SUMMA VA TAVSIFNI aniqlang.
+Matnni tahlil qiling va SUMMA, TURI (income yoki expense) VA TAVSIFNI aniqlang.
+
+MUHIM QOIDALAR:
+1. DAROMAD (income): "oylik", "maosh", "zarplata", "avans", "stipendiya", "tushum", "ishhaqi", "pul tushdi", "oldim", "daromad", "bonus", "freelance" kabi so'zlar bo'lsa -> intent: "income"
+2. XARAJA (expense): "taksi", "ovqat", "do'kon", "ishlatdim", "ketdi", "sarfladim", "to'ladim", "xarajat", "harajat", "bozor" -> intent: "expense"
 
 MUHIM SO'Z SHAKLLARI:
 - "ming" / "k" = 000 (masalan: "10 ming" -> 10000, "50k" -> 50000)
 - "mln" / "million" = 000000 (masalan: "2 mln" -> 2000000, "1.5 million" -> 1500000)
-- "dollor" / "$" / "usd" = 13000 ga ko'paytirilsin (masalan: "10$" -> 130000)
 
 Matn: "${text}"
 
 JSON qaytaring:
-1. Xarajat bo'lsa (masalan: "10 ming taksiga ishlatdim", "ovqatga 25000 ketdi", "taksi 15000"):
+- Daromad bo'lsa (masalan: "2 mln oylik", "oylik 3000000", "500$ oldim"):
+{
+  "intent": "income",
+  "amount": 2000000,
+  "description": "oylik"
+}
+
+- Xarajat bo'lsa (masalan: "10 ming taksiga ishlatdim", "taksi 15000"):
 {
   "intent": "expense",
   "amount": 10000,
   "description": "taksi"
 }
 
-2. Daromad bo'lsa (masalan: "oylik tushdi 3 mln", "500000 oldim"):
-{
-  "intent": "income",
-  "amount": 3000000,
-  "description": "oylik"
-}
+- Qarz berilsa: {"intent": "debt_gave", "person": "Ism", "amount": 500000}
+- Qarz olinsa: {"intent": "debt_received", "person": "Ism", "amount": 200000}
+- Hisobot: {"intent": "report"}
+- Qarzlar: {"intent": "debts_list"}
 
-3. Qarz berilsa (masalan: "Ali ga 500000 qarz berdim"):
-{
-  "intent": "debt_gave",
-  "person": "Ali",
-  "amount": 500000
-}
-
-4. Qarz olinsa (masalan: "Validan 200 ming qarz oldim"):
-{
-  "intent": "debt_received",
-  "person": "Vali",
-  "amount": 200000
-}
-
-5. Hisobot bo'lsa: {"intent": "report"}
-6. Qarzlar bo'lsa: {"intent": "debts_list"}
-
-7. Aks holda suhbat javobi:
-{
-  "intent": "ai_reply",
-  "reply": "Samimiy javob matni..."
-}
-
-Faqat JSON qaytaring.`;
+Faqat valid JSON qaytaring.`;
 
     try {
         if (GROQ_API_KEY) {
@@ -127,14 +113,14 @@ Faqat JSON qaytaring.`;
             const match = content.match(/\{.*?\}/s);
             if (match) {
                 const parsed = JSON.parse(match[0]);
-                if (parsed.intent) return parsed;
+                if (parsed.intent && parsed.amount) return parsed;
             }
         }
     } catch (e) {
         console.error("Groq intent error:", e);
     }
 
-    // Smart local regex fallback if Groq API fails or key is missing
+    // Local fallback regex parser
     return fallbackRegexParser(text);
 }
 
@@ -164,15 +150,25 @@ function fallbackRegexParser(text: string) {
     }
 
     if (amount) {
-        // Determine if income or expense
-        if (/ishlatdim|ketdi|berdim|berdim|sarfladim|taksi|ovqat|bozor|do'kon|tushlik|taksi/i.test(lower)) {
-            const desc = text.replace(/(\d+[\d\s\.]*)\s*(?:ming|k|mln|million|so'm)?/gi, "").replace(/ishlatdim|ketdi|sarfladim/gi, "").trim();
-            return { intent: "expense", amount, description: desc || text };
+        // INCOME KEYWORDS: oylik, maosh, zarplata, avans, stipendiya, tushum, ishhaqi, daromad, bonus, freelance
+        if (/oylik|maosh|zarplata|avans|stipendiya|tushum|ishhaqi|daromad|bonus|freelance|tushdi/i.test(lower)) {
+            const desc = text
+                .replace(/(\d+[\d\s\.]*)\s*(?:ming|k|mln|million|so'm)?/gi, "")
+                .replace(/tushdi|oldim|keldi|berishdi/gi, "")
+                .trim();
+            return { intent: "income", amount, description: desc || "oylik" };
         }
-        if (/tushdi|oldim|keldi|ishladim|daromad|maosh/i.test(lower)) {
-            const desc = text.replace(/(\d+[\d\s\.]*)\s*(?:ming|k|mln|million|so'm)?/gi, "").replace(/tushdi|oldim|keldi/gi, "").trim();
-            return { intent: "income", amount, description: desc || text };
+
+        // EXPENSE KEYWORDS: ishlatdim, ketdi, sarfladim, taksi, ovqat, do'kon, bozor, tushlik, xarajat, harajat, to'ladim
+        if (/ishlatdim|ketdi|sarfladim|taksi|ovqat|do'kon|bozor|tushlik|xarajat|harajat|to'ladim|berdim/i.test(lower)) {
+            const desc = text
+                .replace(/(\d+[\d\s\.]*)\s*(?:ming|k|mln|million|so'm)?/gi, "")
+                .replace(/ishlatdim|ketdi|sarfladim|to'ladim/gi, "")
+                .trim();
+            return { intent: "expense", amount, description: desc || "xarajat" };
         }
+
+        // Default if number provided without strong keywords
         return { intent: "expense", amount, description: text };
     }
 
@@ -181,6 +177,6 @@ function fallbackRegexParser(text: string) {
 
     return {
         intent: "ai_reply",
-        reply: "🤖 Tushundim! Xarajat yoki daromadingizni yozishingiz mumkin (masalan: <i>10 ming taksi</i> yoki <i>2 mln oylik</i>)."
+        reply: "🤖 Tushundim! Xarajat yoki daromadingizni kiritishingiz mumkin (masalan: <i>2 mln oylik</i> yoki <i>15000 taksi</i>)."
     };
 }
