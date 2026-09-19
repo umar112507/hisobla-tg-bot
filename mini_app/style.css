@@ -327,8 +327,10 @@ body::before {
 
 .filter-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 14px;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .filter-btn {
@@ -337,11 +339,12 @@ body::before {
   border-radius: var(--radius-pill);
   color: var(--text-secondary);
   font-family: 'Inter', sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
-  padding: 6px 14px;
+  padding: 6px 12px;
   cursor: pointer;
   transition: var(--transition);
+  white-space: nowrap;
 }
 
 .filter-btn:hover {
@@ -555,6 +558,11 @@ body::before {
   border-left: 3px solid var(--accent-green);
 }
 
+.debt-item.paid-item {
+  border-left: 3px solid var(--text-muted);
+  opacity: 0.65;
+}
+
 .debt-header {
   display: flex;
   align-items: center;
@@ -598,8 +606,18 @@ body::before {
   color: var(--accent-blue);
 }
 
+.debt-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  pt-2;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
 .debt-deadline {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
 }
 
@@ -609,6 +627,40 @@ body::before {
 
 .debt-deadline.due-soon {
   color: var(--accent-orange);
+}
+
+.debt-deadline.paid {
+  color: var(--accent-green);
+}
+
+.debt-pay-btn {
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.2), rgba(0, 200, 83, 0.4));
+  border: 1px solid rgba(0, 230, 118, 0.5);
+  border-radius: var(--radius-pill);
+  color: var(--accent-green);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.debt-pay-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.35), rgba(0, 200, 83, 0.6));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 230, 118, 0.2);
+}
+
+.debt-paid-badge {
+  background: rgba(0, 230, 118, 0.15);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  border-radius: var(--radius-pill);
+  color: var(--accent-green);
+  font-size: 11px;
+  padding: 4px 10px;
+  font-weight: 600;
 }
 
 /* ─── Charts ────────────────────────────────────────────────── */

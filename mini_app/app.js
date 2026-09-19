@@ -27,7 +27,7 @@ let incomeChartInstance = null;
 let allTransactions = [];
 let allDebts = [];
 let currentFilter = "all";
-let currentDebtFilter = "all";
+let currentDebtFilter = "active";
 let summaryData = null;
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -105,7 +105,7 @@ async function loadTransactions() {
 
 async function loadDebts() {
     try {
-        const res = await fetch(`${API_BASE}/api/debts?user_id=${USER_ID}`);
+        const res = await fetch(`${API_BASE}/api/debts?user_id=${USER_ID}&include_paid=true`);
         allDebts = await res.json();
         renderDebts(allDebts);
     } catch (e) {
@@ -175,14 +175,9 @@ function renderDebts(debts) {
     const container = document.getElementById("debtsList");
     const summaryRow = document.getElementById("debtSummary");
 
-    if (!debts || !debts.length) {
-        summaryRow.innerHTML = "";
-        container.innerHTML = emptyState("✅", "Faol qarzlar yo'q!");
-        return;
-    }
-
-    const gave = debts.filter(d => d.direction === "gave");
-    const received = debts.filter(d => d.direction === "received");
+    const activeDebts = debts.filter(d => !d.is_paid);
+    const gave = activeDebts.filter(d => d.direction === "gave");
+    const received = activeDebts.filter(d => d.direction === "received");
     const totalGave = gave.reduce((s, d) => s + Number(d.amount), 0);
     const totalReceived = received.reduce((s, d) => s + Number(d.amount), 0);
 
@@ -196,18 +191,25 @@ function renderDebts(debts) {
       <div class="debt-sum-amount received">${formatAmount(totalReceived)}</div>
     </div>`;
 
-    const filteredDebts = currentDebtFilter === "all"
-        ? debts
-        : debts.filter(d => d.direction === currentDebtFilter);
+    let filteredDebts = [];
+    if (currentDebtFilter === "active") {
+        filteredDebts = debts.filter(d => !d.is_paid);
+    } else if (currentDebtFilter === "gave") {
+        filteredDebts = debts.filter(d => !d.is_paid && d.direction === "gave");
+    } else if (currentDebtFilter === "received") {
+        filteredDebts = debts.filter(d => !d.is_paid && d.direction === "received");
+    } else if (currentDebtFilter === "paid") {
+        filteredDebts = debts.filter(d => d.is_paid);
+    }
 
     if (!filteredDebts.length) {
-        container.innerHTML = emptyState("💳", "Ushbu turdagi qarzlar yo'q!");
+        container.innerHTML = emptyState("💳", "Ushbu bo'limda qarzlar yo'q!");
         return;
     }
 
     container.innerHTML = filteredDebts.map(d => {
         let days = null;
-        if (d.due_date) {
+        if (d.due_date && !d.is_paid) {
             const todayDate = new Date();
             todayDate.setHours(0, 0, 0, 0);
             const dueDate = new Date(d.due_date);
@@ -217,11 +219,11 @@ function renderDebts(debts) {
             days = Math.round(diffTime / (1000 * 60 * 60 * 24));
         }
 
-        let urgencyClass = "ok";
-        let deadlineText = "📅 Muddat belgilanmagan";
-        let deadlineClass = "";
+        let urgencyClass = d.is_paid ? "paid-item" : "ok";
+        let deadlineText = d.is_paid ? "✅ Qaytarilgan / To'langan" : "📅 Muddat belgilanmagan";
+        let deadlineClass = d.is_paid ? "paid" : "";
 
-        if (days !== null) {
+        if (!d.is_paid && days !== null) {
             if (days < 0) {
                 urgencyClass = "overdue";
                 deadlineClass = "overdue";
@@ -240,6 +242,8 @@ function renderDebts(debts) {
         }
 
         const dirText = d.direction === "gave" ? "📤 Berdim" : "📥 Oldim";
+        const payBtnText = d.direction === "received" ? "✅ To'ladim (Balansdan ayirish)" : "✅ Qaytdi (Balansga qo'shish)";
+
         return `
       <div class="debt-item ${urgencyClass}">
         <div class="debt-header">
@@ -248,9 +252,35 @@ function renderDebts(debts) {
         </div>
         <div class="debt-amount ${d.direction}">${formatAmount(d.amount)}</div>
         ${d.description ? `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">📝 ${escHtml(d.description)}</div>` : ""}
-        <div class="debt-deadline ${deadlineClass}">${deadlineText}</div>
+        <div class="debt-footer">
+          <div class="debt-deadline ${deadlineClass}">${deadlineText}</div>
+          ${!d.is_paid ? `<button class="debt-pay-btn" onclick="payDebt('${d.id}')">${payBtnText}</button>` : `<span class="debt-paid-badge">✅ To'langan</span>`}
+        </div>
       </div>`;
     }).join("");
+}
+
+// ─── Pay / Settle Debt ────────────────────────────────────────
+async function payDebt(debtId) {
+    if (!confirm("Ushbu qarzni qaytarilgan deb belgilamoqchimisiz? (Balansingiz mos ravishda yangilanadi)")) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/debts/pay`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ debt_id: debtId, user_id: USER_ID }),
+        });
+
+        if (res.ok) {
+            showToast("🎉 Qarz to'langan deb belgilandi va balans yangilandi!");
+            loadAll();
+        } else {
+            showToast("❌ Xatolik yuz berdi");
+        }
+    } catch (e) {
+        console.error("Pay debt error:", e);
+        showToast("❌ Xatolik yuz berdi");
+    }
 }
 
 // ─── Render Charts ────────────────────────────────────────────
@@ -314,6 +344,7 @@ function setupTabs() {
             document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
             document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
             btn.classList.add("active");
+            document.getElementById(`tab-${btn.dataset.tab}`).classList.active;
             document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
 
             if (btn.dataset.tab === "statistics" && summaryData) {

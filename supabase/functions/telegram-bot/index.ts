@@ -18,7 +18,64 @@ Deno.serve(async (req) => {
         return new Response("ok", { headers: corsHeaders });
     }
 
-    // API Endpoints for Mini App (Delete Transaction)
+    // API Endpoint: Pay / Settle Debt
+    if (req.method === "POST" && url.pathname.endsWith("/api/debts/pay")) {
+        try {
+            const body = await req.json();
+            const { debt_id, user_id } = body;
+
+            if (debt_id && user_id) {
+                // Fetch debt details first
+                const { data: debt } = await supabase
+                    .from("debts")
+                    .select("*")
+                    .eq("id", debt_id)
+                    .eq("user_id", user_id)
+                    .single();
+
+                if (debt) {
+                    // Mark debt as paid
+                    await supabase
+                        .from("debts")
+                        .update({ is_paid: true })
+                        .eq("id", debt_id);
+
+                    // Add transaction & adjust balance automatically
+                    if (debt.direction === "received") {
+                        // I borrowed money and now paid it back -> EXPENSE
+                        await supabase.from("transactions").insert({
+                            user_id: user_id,
+                            type: "expense",
+                            amount: debt.amount,
+                            category: "Qarz to'lovi",
+                            description: `${debt.person_name} ga qarz to'landi`,
+                        });
+                    } else if (debt.direction === "gave") {
+                        // I gave debt and now received it back -> INCOME
+                        await supabase.from("transactions").insert({
+                            user_id: user_id,
+                            type: "income",
+                            amount: debt.amount,
+                            category: "Qarz qaytishi",
+                            description: `${debt.person_name} dan qarz qaytdi`,
+                        });
+                    }
+
+                    return new Response(JSON.stringify({ success: true }), {
+                        headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    });
+                }
+            }
+        } catch (e) {
+            console.error("Pay debt error:", e);
+        }
+        return new Response(JSON.stringify({ success: false }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
+
+    // API Endpoint: Delete Transaction
     if ((req.method === "POST" || req.method === "DELETE") && url.pathname.endsWith("/api/transactions/delete")) {
         try {
             const body = await req.json();
@@ -44,7 +101,7 @@ Deno.serve(async (req) => {
         });
     }
 
-    // API Endpoints for Mini App (GET Requests)
+    // API Endpoints (GET Requests)
     if (req.method === "GET") {
         const userId = Number(url.searchParams.get("user_id"));
 
@@ -66,12 +123,14 @@ Deno.serve(async (req) => {
             if (!userId) {
                 return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
-            const { data } = await supabase
-                .from("debts")
-                .select("*")
-                .eq("user_id", userId)
-                .eq("is_paid", false)
-                .order("due_date", { ascending: true });
+            const includePaid = url.searchParams.get("include_paid") === "true";
+
+            let query = supabase.from("debts").select("*").eq("user_id", userId);
+            if (!includePaid) {
+                query = query.eq("is_paid", false);
+            }
+            const { data } = await query.order("due_date", { ascending: true });
+
             return new Response(JSON.stringify(data || []), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
