@@ -13,8 +13,6 @@
   --accent-orange: #ff9800;
   --accent-purple: #ce93d8;
   --gradient-balance: linear-gradient(135deg, #1a237e 0%, #0d47a1 50%, #006064 100%);
-  --gradient-income: linear-gradient(135deg, #1b5e20, #2e7d32);
-  --gradient-expense: linear-gradient(135deg, #b71c1c, #c62828);
   --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
   --radius: 16px;
   --radius-sm: 10px;
@@ -55,7 +53,6 @@ body::before {
   z-index: 0;
 }
 
-/* ─── Glass Card ────────────────────────────────────────────── */
 .glass-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
@@ -328,7 +325,6 @@ body::before {
   }
 }
 
-/* ─── Filter Row ────────────────────────────────────────────── */
 .filter-row {
   display: flex;
   gap: 8px;
@@ -366,7 +362,7 @@ body::before {
   gap: 10px;
 }
 
-/* ─── Transaction Item ──────────────────────────────────────── */
+/* ─── Transaction Item & Delete Button ──────────────────────── */
 .tx-item {
   display: flex;
   align-items: center;
@@ -394,7 +390,6 @@ body::before {
 .tx-item:hover {
   background: var(--bg-card-hover);
   border-color: rgba(255, 255, 255, 0.18);
-  transform: translateX(2px);
 }
 
 .tx-icon-wrap {
@@ -450,10 +445,16 @@ body::before {
   color: var(--text-muted);
 }
 
+.tx-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .tx-amount {
   font-size: 15px;
   font-weight: 700;
-  flex-shrink: 0;
   text-align: right;
 }
 
@@ -463,6 +464,28 @@ body::before {
 
 .tx-amount.expense {
   color: var(--accent-red);
+}
+
+.tx-delete-btn {
+  background: rgba(255, 82, 82, 0.1);
+  border: 1px solid rgba(255, 82, 82, 0.2);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  transition: var(--transition);
+  opacity: 0.7;
+}
+
+.tx-delete-btn:hover {
+  background: rgba(255, 82, 82, 0.25);
+  border-color: rgba(255, 82, 82, 0.5);
+  opacity: 1;
+  transform: scale(1.08);
 }
 
 /* ─── Debt cards ────────────────────────────────────────────── */

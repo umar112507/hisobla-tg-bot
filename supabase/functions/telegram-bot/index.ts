@@ -7,7 +7,7 @@ const handleUpdate = webhookCallback(bot, "std/http");
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
 };
 
 Deno.serve(async (req) => {
@@ -18,7 +18,33 @@ Deno.serve(async (req) => {
         return new Response("ok", { headers: corsHeaders });
     }
 
-    // API Endpoints for Mini App
+    // API Endpoints for Mini App (Delete Transaction)
+    if ((req.method === "POST" || req.method === "DELETE") && url.pathname.endsWith("/api/transactions/delete")) {
+        try {
+            const body = await req.json();
+            const { id, user_id } = body;
+
+            if (id && user_id) {
+                await supabase
+                    .from("transactions")
+                    .delete()
+                    .eq("id", id)
+                    .eq("user_id", user_id);
+
+                return new Response(JSON.stringify({ success: true }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                });
+            }
+        } catch (e) {
+            console.error("Delete transaction error:", e);
+        }
+        return new Response(JSON.stringify({ success: false }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
+
+    // API Endpoints for Mini App (GET Requests)
     if (req.method === "GET") {
         const userId = Number(url.searchParams.get("user_id"));
 

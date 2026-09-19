@@ -139,9 +139,33 @@ function renderTransactions(transactions) {
             <span class="tx-date">${dateStr}</span>
           </div>
         </div>
-        <div class="tx-amount ${t.type}">${sign}${formatAmount(t.amount)}</div>
+        <div class="tx-right">
+          <div class="tx-amount ${t.type}">${sign}${formatAmount(t.amount)}</div>
+          <button class="tx-delete-btn" onclick="deleteTx('${t.id}')" title="O'chirish">🗑️</button>
+        </div>
       </div>`;
     }).join("");
+}
+
+// ─── Delete Transaction ───────────────────────────────────────
+async function deleteTx(id) {
+    if (!confirm("Ushbu tranzaksiyani o'chirmoqchimisiz?")) return;
+    try {
+        const res = await fetch(`${API_BASE}/api/transactions/delete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, user_id: USER_ID }),
+        });
+        if (res.ok) {
+            showToast("🗑️ Tranzaksiya o'chirildi");
+            loadAll();
+        } else {
+            showToast("❌ O'chirishda xatolik yuz berdi");
+        }
+    } catch (e) {
+        console.error("Delete failed:", e);
+        showToast("❌ Xatolik yuz berdi");
+    }
 }
 
 // ─── Render Debts ─────────────────────────────────────────────
@@ -292,6 +316,15 @@ function setupFilters() {
             renderTransactions(allTransactions);
         });
     });
+}
+
+// ─── Toast Notification ───────────────────────────────────────
+function showToast(msg) {
+    const toast = document.getElementById("toast");
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 2500);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
