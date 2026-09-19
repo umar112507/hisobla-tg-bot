@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hisobla – Moliyaviy Hisoblar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <div class="logo">
+        <span class="logo-icon">💰</span>
+        <span class="logo-text">Hisobla</span>
+      </div>
+      <div class="user-badge" id="userBadge">Yuklanmoqda...</div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- Balance Card -->
+    <section class="balance-section">
+      <div class="balance-card glass-card">
+        <div class="balance-label">Umumiy balans</div>
+        <div class="balance-amount" id="balanceAmount">—</div>
+        <div class="balance-stats">
+          <div class="stat-item income-stat">
+            <div class="stat-icon">📈</div>
+            <div class="stat-info">
+              <span class="stat-label">Daromad</span>
+              <span class="stat-value" id="totalIncome">—</span>
+            </div>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item expense-stat">
+            <div class="stat-icon">📉</div>
+            <div class="stat-info">
+              <span class="stat-label">Xarajat</span>
+              <span class="stat-value" id="totalExpense">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="transactions">
+        <span>📋</span> Tranzaksiyalar
+      </button>
+      <button class="tab-btn" data-tab="debts">
+        <span>💳</span> Qarzlar
+      </button>
+      <button class="tab-btn" data-tab="statistics">
+        <span>📊</span> Statistika
+      </button>
+    </nav>
+
+    <!-- Transactions Tab -->
+    <div class="tab-content active" id="tab-transactions">
+      <div class="filter-row">
+        <button class="filter-btn active" data-filter="all">Hammasi</button>
+        <button class="filter-btn" data-filter="income">💰 Daromad</button>
+        <button class="filter-btn" data-filter="expense">💸 Xarajat</button>
+      </div>
+      <div class="list-container" id="transactionsList">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <span>Yuklanmoqda...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Debts Tab -->
+    <div class="tab-content" id="tab-debts">
+      <div class="debt-summary-row" id="debtSummary"></div>
+      <div class="list-container" id="debtsList">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <span>Yuklanmoqda...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics Tab -->
+    <div class="tab-content" id="tab-statistics">
+      <div class="chart-section">
+        <div class="chart-card glass-card">
+          <h3 class="chart-title">Xarajatlar taqsimoti</h3>
+          <div class="chart-wrapper">
+            <canvas id="expenseChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card glass-card">
+          <h3 class="chart-title">Daromadlar taqsimoti</h3>
+          <div class="chart-wrapper">
+            <canvas id="incomeChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Toast notification -->
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
