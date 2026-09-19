@@ -40,24 +40,28 @@ document.addEventListener("DOMContentLoaded", () => {
     loadAll(false);
     setupTabs();
     setupFilters();
-    setupAutoSync();
+    setupSmartSync();
 });
 
-// ─── Auto Sync (Real-time Background Sync) ─────────────────────
-function setupAutoSync() {
-    // Sync every 3.5 seconds silently
+// ─── Smart Event-Based Sync (DB Resource Optimized) ───────────
+function setupSmartSync() {
+    // Low-frequency background polling (every 15 seconds) to save DB quota
     if (autoRefreshTimer) clearInterval(autoRefreshTimer);
     autoRefreshTimer = setInterval(() => {
         if (!document.hidden) {
             loadAll(true);
         }
-    }, 3500);
+    }, 15000);
 
-    // Sync when window/app gains focus or visibility changes
+    // Instant update when user switches back to Mini App tab or window
     document.addEventListener("visibilitychange", () => {
         if (!document.hidden) loadAll(true);
     });
     window.addEventListener("focus", () => loadAll(true));
+
+    if (tg) {
+        tg.onEvent("viewportChanged", () => loadAll(true));
+    }
 }
 
 // ─── Render Telegram Profile ──────────────────────────────────
@@ -120,7 +124,6 @@ async function loadTransactions(isSilent = false) {
         const res = await fetch(`${API_BASE}/api/transactions?user_id=${USER_ID}`);
         const newTx = await res.json();
 
-        // Only re-render if data actually changed or not silent
         if (JSON.stringify(newTx) !== JSON.stringify(allTransactions) || !isSilent) {
             allTransactions = newTx;
             renderTransactions(allTransactions);
@@ -138,7 +141,6 @@ async function loadDebts(isSilent = false) {
         const res = await fetch(`${API_BASE}/api/debts?user_id=${USER_ID}&include_paid=true`);
         const newDebts = await res.json();
 
-        // Only re-render if data actually changed or not silent
         if (JSON.stringify(newDebts) !== JSON.stringify(allDebts) || !isSilent) {
             allDebts = newDebts;
             renderDebts(allDebts);
