@@ -3,7 +3,7 @@ import { ensureUser, addTransaction, addDebt, getDebts, getSummary } from "./db.
 import { categorizeTransaction, parseIntent } from "./ai.ts";
 
 const BOT_TOKEN = Deno.env.get("BOT_TOKEN") || "";
-const MINI_APP_URL = Deno.env.get("MINI_APP_URL") || "https://example.com";
+const MINI_APP_URL = Deno.env.get("MINI_APP_URL") || "https://hisoblatg.netlify.app";
 
 export const bot = new Bot(BOT_TOKEN);
 

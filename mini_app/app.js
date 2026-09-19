@@ -1,5 +1,16 @@
 // ─── Config ───────────────────────────────────────────────────
-const API_BASE = window.location.origin;
+const SUPABASE_URL = "https://dyqmawwyooeqadibnpqc.supabase.co";
+// Supabase Public Anon Key
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5cW1hd3d5b29lcWFkaWJucHFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAyMDAwMDAwMH0.placeholder";
+
+let supabaseClient = null;
+if (window.supabase) {
+    supabaseClient = window.supabase.createClient(
+        SUPABASE_URL,
+        "sbp_placeholder" // Will fall back or fetch via REST if anon key isn't passed
+    );
+}
+
 const tg = window.Telegram?.WebApp;
 
 let USER_ID = null;
@@ -10,14 +21,16 @@ if (tg && tg.initDataUnsafe?.user) {
     USER_ID = tgUser.id;
 } else {
     const params = new URLSearchParams(window.location.search);
-    USER_ID = params.get("user_id");
+    USER_ID = params.get("user_id") || params.get("id");
 }
 
-// ─── Init ─────────────────────────────────────────────────────
+// ─── Init Telegram WebApp ─────────────────────────────────────
 if (tg) {
     tg.expand();
-    tg.setHeaderColor("#0a0e1a");
-    tg.setBackgroundColor("#0a0e1a");
+    try {
+        tg.setHeaderColor("#0a0e1a");
+        tg.setBackgroundColor("#0a0e1a");
+    } catch (e) { }
 }
 
 let expenseChartInstance = null;
@@ -29,7 +42,7 @@ let summaryData = null;
 document.addEventListener("DOMContentLoaded", () => {
     renderUserProfile();
     if (!USER_ID) {
-        showEmptyAll("User ID topilmadi. Botdan oching.");
+        showEmptyAll("Telegram ID topilmadi. Bot orqali oching.");
         return;
     }
     loadAll();
@@ -65,44 +78,86 @@ function renderUserProfile() {
 
 // ─── Data Loading ─────────────────────────────────────────────
 async function loadAll() {
-    await Promise.all([loadSummary(), loadTransactions(), loadDebts()]);
+    await Promise.all([loadTransactionsAndSummary(), loadDebts()]);
 }
 
-async function loadSummary() {
-    try {
-        const res = await fetch(`${API_BASE}/api/summary/${USER_ID}`);
-        const data = await res.json();
-        summaryData = data;
+async function fetchSupabaseRest(endpoint) {
+    const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
+    const res = await fetch(url, {
+        headers: {
+            "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5cW1hd3d5b29lcWFkaWJucHFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAyMDAwMDAwMH0",
+            "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5cW1hd3d5b29lcWFkaWJucHFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAyMDAwMDAwMH0`
+        }
+    });
+    return res.json();
+}
 
-        const balance = data.balance || 0;
+async function loadTransactionsAndSummary() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?user_id=eq.${USER_ID}&order=created_at.desc`, {
+            headers: {
+                "Prefer": "return=representation"
+            }
+        });
+
+        let transactions = [];
+        if (res.ok) {
+            transactions = await res.json();
+        } else {
+            // Fallback local or backend call
+            const backRes = await fetch(`/api/transactions/${USER_ID}`);
+            transactions = await backRes.json();
+        }
+
+        allTransactions = Array.isArray(transactions) ? transactions : [];
+
+        // Calculate Summary
+        const totalIncome = allTransactions
+            .filter(t => t.type === "income")
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+        const totalExpense = allTransactions
+            .filter(t => t.type === "expense")
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+        const balance = totalIncome - totalExpense;
+
+        // Category Breakdown
+        const catMap = {};
+        allTransactions.forEach(t => {
+            const key = `${t.type}:${t.category}`;
+            catMap[key] = (catMap[key] || 0) + Number(t.amount);
+        });
+
+        const categories = Object.keys(catMap).map(key => {
+            const [type, category] = key.split(":");
+            return { type, category, total: catMap[key] };
+        });
+
+        summaryData = { total_income: totalIncome, total_expense: totalExpense, balance, categories };
+
+        // Update Balance UI
         const el = document.getElementById("balanceAmount");
         el.textContent = formatAmount(balance);
         el.className = "balance-amount " + (balance >= 0 ? "positive" : "negative");
 
-        document.getElementById("totalIncome").textContent = formatAmount(data.total_income || 0);
-        document.getElementById("totalExpense").textContent = formatAmount(data.total_expense || 0);
+        document.getElementById("totalIncome").textContent = formatAmount(totalIncome);
+        document.getElementById("totalExpense").textContent = formatAmount(totalExpense);
 
-        renderCharts(data.categories || []);
-    } catch (e) {
-        console.error("Summary load failed:", e);
-    }
-}
-
-async function loadTransactions() {
-    try {
-        const res = await fetch(`${API_BASE}/api/transactions/${USER_ID}?limit=100`);
-        allTransactions = await res.json();
         renderTransactions(allTransactions);
+        renderCharts(categories);
     } catch (e) {
-        document.getElementById("transactionsList").innerHTML = emptyState("📭", "Tranzaksiyalar yuklanmadi");
+        console.error("Transactions load failed:", e);
+        renderTransactions([]);
     }
 }
 
 async function loadDebts() {
     try {
-        const res = await fetch(`${API_BASE}/api/debts/${USER_ID}`);
-        const debts = await res.json();
-        renderDebts(debts);
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/debts?user_id=eq.${USER_ID}&is_paid=eq.false&order=due_date.asc`);
+        let debts = [];
+        if (res.ok) {
+            debts = await res.json();
+        }
+        renderDebts(Array.isArray(debts) ? debts : []);
     } catch (e) {
         document.getElementById("debtsList").innerHTML = emptyState("💳", "Qarzlar yuklanmadi");
     }
@@ -153,8 +208,8 @@ function renderDebts(debts) {
 
     const gave = debts.filter(d => d.direction === "gave");
     const received = debts.filter(d => d.direction === "received");
-    const totalGave = gave.reduce((s, d) => s + d.amount, 0);
-    const totalReceived = received.reduce((s, d) => s + d.amount, 0);
+    const totalGave = gave.reduce((s, d) => s + Number(d.amount), 0);
+    const totalReceived = received.reduce((s, d) => s + Number(d.amount), 0);
 
     summaryRow.innerHTML = `
     <div class="debt-sum-card gave">
@@ -167,12 +222,17 @@ function renderDebts(debts) {
     </div>`;
 
     container.innerHTML = debts.map(d => {
-        const days = d.days_remaining;
+        let days = null;
+        if (d.due_date) {
+            const diffTime = new Date(d.due_date).getTime() - new Date().getTime();
+            days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
         let urgencyClass = "ok";
         let deadlineText = "📅 Muddat belgilanmagan";
         let deadlineClass = "";
 
-        if (days !== null && days !== undefined) {
+        if (days !== null) {
             if (days < 0) {
                 urgencyClass = "overdue";
                 deadlineClass = "overdue";
