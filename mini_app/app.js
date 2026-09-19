@@ -29,6 +29,7 @@ let allDebts = [];
 let currentFilter = "all";
 let currentDebtFilter = "active";
 let summaryData = null;
+let autoRefreshTimer = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     renderUserProfile();
@@ -36,10 +37,28 @@ document.addEventListener("DOMContentLoaded", () => {
         showEmptyAll("Telegram ID topilmadi. Bot orqali oching.");
         return;
     }
-    loadAll();
+    loadAll(false);
     setupTabs();
     setupFilters();
+    setupAutoSync();
 });
+
+// ─── Auto Sync (Real-time Background Sync) ─────────────────────
+function setupAutoSync() {
+    // Sync every 3.5 seconds silently
+    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+    autoRefreshTimer = setInterval(() => {
+        if (!document.hidden) {
+            loadAll(true);
+        }
+    }, 3500);
+
+    // Sync when window/app gains focus or visibility changes
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) loadAll(true);
+    });
+    window.addEventListener("focus", () => loadAll(true));
+}
 
 // ─── Render Telegram Profile ──────────────────────────────────
 function renderUserProfile() {
@@ -67,12 +86,16 @@ function renderUserProfile() {
     }
 }
 
-// ─── Data Loading ─────────────────────────────────────────────
-async function loadAll() {
-    await Promise.all([loadSummary(), loadTransactions(), loadDebts()]);
+// ─── Data Loading (Supports Silent Refresh) ────────────────────
+async function loadAll(isSilent = false) {
+    await Promise.all([
+        loadSummary(isSilent),
+        loadTransactions(isSilent),
+        loadDebts(isSilent)
+    ]);
 }
 
-async function loadSummary() {
+async function loadSummary(isSilent = false) {
     try {
         const res = await fetch(`${API_BASE}/api/summary?user_id=${USER_ID}`);
         const data = await res.json();
@@ -88,29 +111,43 @@ async function loadSummary() {
 
         renderCharts(data.categories || []);
     } catch (e) {
-        console.error("Summary load failed:", e);
+        if (!isSilent) console.error("Summary load failed:", e);
     }
 }
 
-async function loadTransactions() {
+async function loadTransactions(isSilent = false) {
     try {
         const res = await fetch(`${API_BASE}/api/transactions?user_id=${USER_ID}`);
-        allTransactions = await res.json();
-        renderTransactions(allTransactions);
+        const newTx = await res.json();
+
+        // Only re-render if data actually changed or not silent
+        if (JSON.stringify(newTx) !== JSON.stringify(allTransactions) || !isSilent) {
+            allTransactions = newTx;
+            renderTransactions(allTransactions);
+        }
     } catch (e) {
-        console.error("Transactions load error:", e);
-        document.getElementById("transactionsList").innerHTML = emptyState("📭", "Tranzaksiyalar yuklanmadi");
+        if (!isSilent) {
+            console.error("Transactions load error:", e);
+            document.getElementById("transactionsList").innerHTML = emptyState("📭", "Tranzaksiyalar yuklanmadi");
+        }
     }
 }
 
-async function loadDebts() {
+async function loadDebts(isSilent = false) {
     try {
         const res = await fetch(`${API_BASE}/api/debts?user_id=${USER_ID}&include_paid=true`);
-        allDebts = await res.json();
-        renderDebts(allDebts);
+        const newDebts = await res.json();
+
+        // Only re-render if data actually changed or not silent
+        if (JSON.stringify(newDebts) !== JSON.stringify(allDebts) || !isSilent) {
+            allDebts = newDebts;
+            renderDebts(allDebts);
+        }
     } catch (e) {
-        console.error("Debts load error:", e);
-        document.getElementById("debtsList").innerHTML = emptyState("💳", "Qarzlar yuklanmadi");
+        if (!isSilent) {
+            console.error("Debts load error:", e);
+            document.getElementById("debtsList").innerHTML = emptyState("💳", "Qarzlar yuklanmadi");
+        }
     }
 }
 
@@ -160,7 +197,7 @@ async function deleteTx(id) {
         });
         if (res.ok) {
             showToast("🗑️ Tranzaksiya o'chirildi");
-            loadAll();
+            loadAll(false);
         } else {
             showToast("❌ O'chirishda xatolik yuz berdi");
         }
@@ -273,7 +310,7 @@ async function payDebt(debtId) {
 
         if (res.ok) {
             showToast("🎉 Qarz to'langan deb belgilandi va balans yangilandi!");
-            loadAll();
+            loadAll(false);
         } else {
             showToast("❌ Xatolik yuz berdi");
         }
@@ -344,7 +381,6 @@ function setupTabs() {
             document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
             document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
             btn.classList.add("active");
-            document.getElementById(`tab-${btn.dataset.tab}`).classList.active;
             document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
 
             if (btn.dataset.tab === "statistics" && summaryData) {

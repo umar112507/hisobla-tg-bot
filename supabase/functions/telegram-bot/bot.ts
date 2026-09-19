@@ -13,7 +13,7 @@ bot.command("start", async (ctx) => {
     await ensureUser(user.id, user.username, user.first_name, user.last_name);
 
     const kb = new InlineKeyboard()
-        .webApp("📊 Mini App-ni ochishV", `${MINI_APP_URL}?user_id=${user.id}`);
+        .webApp("📊 ILOVAN-ni ochish", `${MINI_APP_URL}?user_id=${user.id}`);
 
     await ctx.reply(
         `👋 Salom, <b>${user.first_name || "Do'stim"}</b>!\n\n` +
