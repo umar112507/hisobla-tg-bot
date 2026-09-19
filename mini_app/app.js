@@ -1,16 +1,5 @@
 // ─── Config ───────────────────────────────────────────────────
-const SUPABASE_URL = "https://dyqmawwyooeqadibnpqc.supabase.co";
-// Supabase Public Anon Key
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5cW1hd3d5b29lcWFkaWJucHFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAyMDAwMDAwMH0.placeholder";
-
-let supabaseClient = null;
-if (window.supabase) {
-    supabaseClient = window.supabase.createClient(
-        SUPABASE_URL,
-        "sbp_placeholder" // Will fall back or fetch via REST if anon key isn't passed
-    );
-}
-
+const API_BASE = "https://dyqmawwyooeqadibnpqc.supabase.co/functions/v1/telegram-bot";
 const tg = window.Telegram?.WebApp;
 
 let USER_ID = null;
@@ -78,87 +67,47 @@ function renderUserProfile() {
 
 // ─── Data Loading ─────────────────────────────────────────────
 async function loadAll() {
-    await Promise.all([loadTransactionsAndSummary(), loadDebts()]);
+    await Promise.all([loadSummary(), loadTransactions(), loadDebts()]);
 }
 
-async function fetchSupabaseRest(endpoint) {
-    const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
-    const res = await fetch(url, {
-        headers: {
-            "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5cW1hd3d5b29lcWFkaWJucHFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAyMDAwMDAwMH0",
-            "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5cW1hd3d5b29lcWFkaWJucHFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAyMDAwMDAwMH0`
-        }
-    });
-    return res.json();
-}
-
-async function loadTransactionsAndSummary() {
+async function loadSummary() {
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/transactions?user_id=eq.${USER_ID}&order=created_at.desc`, {
-            headers: {
-                "Prefer": "return=representation"
-            }
-        });
+        const res = await fetch(`${API_BASE}/api/summary?user_id=${USER_ID}`);
+        const data = await res.json();
+        summaryData = data;
 
-        let transactions = [];
-        if (res.ok) {
-            transactions = await res.json();
-        } else {
-            // Fallback local or backend call
-            const backRes = await fetch(`/api/transactions/${USER_ID}`);
-            transactions = await backRes.json();
-        }
-
-        allTransactions = Array.isArray(transactions) ? transactions : [];
-
-        // Calculate Summary
-        const totalIncome = allTransactions
-            .filter(t => t.type === "income")
-            .reduce((sum, t) => sum + Number(t.amount), 0);
-        const totalExpense = allTransactions
-            .filter(t => t.type === "expense")
-            .reduce((sum, t) => sum + Number(t.amount), 0);
-        const balance = totalIncome - totalExpense;
-
-        // Category Breakdown
-        const catMap = {};
-        allTransactions.forEach(t => {
-            const key = `${t.type}:${t.category}`;
-            catMap[key] = (catMap[key] || 0) + Number(t.amount);
-        });
-
-        const categories = Object.keys(catMap).map(key => {
-            const [type, category] = key.split(":");
-            return { type, category, total: catMap[key] };
-        });
-
-        summaryData = { total_income: totalIncome, total_expense: totalExpense, balance, categories };
-
-        // Update Balance UI
+        const balance = data.balance || 0;
         const el = document.getElementById("balanceAmount");
         el.textContent = formatAmount(balance);
         el.className = "balance-amount " + (balance >= 0 ? "positive" : "negative");
 
-        document.getElementById("totalIncome").textContent = formatAmount(totalIncome);
-        document.getElementById("totalExpense").textContent = formatAmount(totalExpense);
+        document.getElementById("totalIncome").textContent = formatAmount(data.total_income || 0);
+        document.getElementById("totalExpense").textContent = formatAmount(data.total_expense || 0);
 
-        renderTransactions(allTransactions);
-        renderCharts(categories);
+        renderCharts(data.categories || []);
     } catch (e) {
-        console.error("Transactions load failed:", e);
-        renderTransactions([]);
+        console.error("Summary load failed:", e);
+    }
+}
+
+async function loadTransactions() {
+    try {
+        const res = await fetch(`${API_BASE}/api/transactions?user_id=${USER_ID}`);
+        allTransactions = await res.json();
+        renderTransactions(allTransactions);
+    } catch (e) {
+        console.error("Transactions load error:", e);
+        document.getElementById("transactionsList").innerHTML = emptyState("📭", "Tranzaksiyalar yuklanmadi");
     }
 }
 
 async function loadDebts() {
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/debts?user_id=eq.${USER_ID}&is_paid=eq.false&order=due_date.asc`);
-        let debts = [];
-        if (res.ok) {
-            debts = await res.json();
-        }
-        renderDebts(Array.isArray(debts) ? debts : []);
+        const res = await fetch(`${API_BASE}/api/debts?user_id=${USER_ID}`);
+        const debts = await res.json();
+        renderDebts(debts);
     } catch (e) {
+        console.error("Debts load error:", e);
         document.getElementById("debtsList").innerHTML = emptyState("💳", "Qarzlar yuklanmadi");
     }
 }
@@ -170,7 +119,7 @@ function renderTransactions(transactions) {
         : transactions.filter(t => t.type === currentFilter);
 
     const container = document.getElementById("transactionsList");
-    if (!filtered.length) {
+    if (!filtered || !filtered.length) {
         container.innerHTML = emptyState("📭", "Tranzaksiyalar yo'q");
         return;
     }
@@ -200,7 +149,7 @@ function renderDebts(debts) {
     const container = document.getElementById("debtsList");
     const summaryRow = document.getElementById("debtSummary");
 
-    if (!debts.length) {
+    if (!debts || !debts.length) {
         summaryRow.innerHTML = "";
         container.innerHTML = emptyState("✅", "Faol qarzlar yo'q!");
         return;
@@ -266,6 +215,7 @@ function renderDebts(debts) {
 
 // ─── Render Charts ────────────────────────────────────────────
 function renderCharts(categories) {
+    if (!categories) return;
     const expenseCats = categories.filter(c => c.type === "expense");
     const incomeCats = categories.filter(c => c.type === "income");
 
@@ -286,7 +236,7 @@ function renderPieChart(canvasId, data, palette, instanceVar) {
         window[instanceVar].destroy();
     }
 
-    if (!data.length) {
+    if (!data || !data.length) {
         canvas.parentElement.innerHTML = emptyState("📊", "Ma'lumot yo'q");
         return;
     }
