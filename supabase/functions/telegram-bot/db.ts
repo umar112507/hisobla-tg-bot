@@ -5,14 +5,30 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-export async function ensureUser(userId: number, username?: string, firstName?: string) {
+export async function ensureUser(
+    userId: number,
+    username?: string,
+    firstName?: string,
+    lastName?: string,
+    photoUrl?: string
+) {
     const { data } = await supabase.from("users").select("user_id").eq("user_id", userId);
     if (!data || data.length === 0) {
         await supabase.from("users").insert({
             user_id: userId,
             username: username || null,
             first_name: firstName || null,
+            last_name: lastName || null,
+            photo_url: photoUrl || null,
         });
+    } else {
+        // Update profile if changed
+        await supabase.from("users").update({
+            username: username || null,
+            first_name: firstName || null,
+            last_name: lastName || null,
+            photo_url: photoUrl || null,
+        }).eq("user_id", userId);
     }
 }
 

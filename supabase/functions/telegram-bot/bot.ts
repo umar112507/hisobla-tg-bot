@@ -10,7 +10,7 @@ export const bot = new Bot(BOT_TOKEN);
 // /start command
 bot.command("start", async (ctx) => {
     const user = ctx.from!;
-    await ensureUser(user.id, user.username, user.first_name);
+    await ensureUser(user.id, user.username, user.first_name, user.last_name);
 
     const kb = new InlineKeyboard()
         .webApp("📊 Mini App", `${MINI_APP_URL}?user_id=${user.id}`)
@@ -26,7 +26,7 @@ bot.command("start", async (ctx) => {
     await ctx.reply(
         `👋 Salom, <b>${user.first_name || "Do'stim"}</b>!\n\n` +
         `🏦 <b>Hisobla Bot</b> (Supabase Edge Function + AI) ga xush kelibsiz!\n\n` +
-        `Har qanday matnni menga yozishingiz mumkin (masalan: <i>"10 ming taksiga ishlatdim"</i>, <i>"oylik 3 mln"</i>, <i>"Ali ga 100$ berdim"</i>).`,
+        `Har qanday matnni menga yozishingiz mumkin (masalan: <i>"10 ming taksiga ishlatdim"</i>, <i>"2 mln oylik"</i>, <i>"Ali ga 100$ berdim"</i>).`,
         { parse_mode: "HTML", reply_markup: kb }
     );
 });
@@ -67,7 +67,7 @@ bot.on("message:text", async (ctx) => {
     if (text.startsWith("/")) return;
 
     const user = ctx.from;
-    await ensureUser(user.id, user.username, user.first_name);
+    await ensureUser(user.id, user.username, user.first_name, user.last_name);
 
     // Send typing chat action
     await ctx.replyWithChatAction("typing");
@@ -98,7 +98,7 @@ bot.on("message:text", async (ctx) => {
 
 async function handleExpense(ctx: any, text: string) {
     const user = ctx.from!;
-    await ensureUser(user.id, user.username, user.first_name);
+    await ensureUser(user.id, user.username, user.first_name, user.last_name);
 
     const amountMatch = text.match(/\d+/);
     if (!amountMatch) {
@@ -122,7 +122,7 @@ async function handleExpense(ctx: any, text: string) {
 
 async function handleIncome(ctx: any, text: string) {
     const user = ctx.from!;
-    await ensureUser(user.id, user.username, user.first_name);
+    await ensureUser(user.id, user.username, user.first_name, user.last_name);
 
     const amountMatch = text.match(/\d+/);
     if (!amountMatch) {

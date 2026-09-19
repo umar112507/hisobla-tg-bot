@@ -2,10 +2,12 @@
 const API_BASE = window.location.origin;
 const tg = window.Telegram?.WebApp;
 
-// Get user_id from Telegram WebApp or URL param
 let USER_ID = null;
-if (tg && tg.initDataUnsafe?.user?.id) {
-    USER_ID = tg.initDataUnsafe.user.id;
+let tgUser = null;
+
+if (tg && tg.initDataUnsafe?.user) {
+    tgUser = tg.initDataUnsafe.user;
+    USER_ID = tgUser.id;
 } else {
     const params = new URLSearchParams(window.location.search);
     USER_ID = params.get("user_id");
@@ -25,16 +27,41 @@ let currentFilter = "all";
 let summaryData = null;
 
 document.addEventListener("DOMContentLoaded", () => {
+    renderUserProfile();
     if (!USER_ID) {
-        document.getElementById("userBadge").textContent = "User ID yo'q";
         showEmptyAll("User ID topilmadi. Botdan oching.");
         return;
     }
-    document.getElementById("userBadge").textContent = `ID: ${USER_ID}`;
     loadAll();
     setupTabs();
     setupFilters();
 });
+
+// ─── Render Telegram Profile ──────────────────────────────────
+function renderUserProfile() {
+    const avatarEl = document.getElementById("userAvatar");
+    const nameEl = document.getElementById("userName");
+    const usernameEl = document.getElementById("userUsername");
+
+    if (tgUser) {
+        const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ");
+        nameEl.textContent = fullName || "Foydalanuvchi";
+        usernameEl.textContent = tgUser.username ? `@${tgUser.username}` : `ID: ${tgUser.id}`;
+
+        if (tgUser.photo_url) {
+            avatarEl.src = tgUser.photo_url;
+        } else {
+            avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=448aff&color=fff`;
+        }
+    } else if (USER_ID) {
+        nameEl.textContent = `Foydalanuvchi #${USER_ID}`;
+        usernameEl.textContent = `@user${USER_ID}`;
+        avatarEl.src = `https://ui-avatars.com/api/?name=User+${USER_ID}&background=448aff&color=fff`;
+    } else {
+        nameEl.textContent = "Mehmon";
+        usernameEl.textContent = "ID aniqlanmadi";
+    }
+}
 
 // ─── Data Loading ─────────────────────────────────────────────
 async function loadAll() {
@@ -230,7 +257,7 @@ function renderPieChart(canvasId, data, palette, instanceVar) {
     });
 }
 
-// ─── Tabs ─────────────────────────────────────────────────────
+// ─── Tabs & Filters ───────────────────────────────────────────
 function setupTabs() {
     document.querySelectorAll(".tab-btn").forEach(btn => {
         btn.addEventListener("click", () => {
@@ -240,7 +267,6 @@ function setupTabs() {
             document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
 
             if (btn.dataset.tab === "statistics" && summaryData) {
-                // Re-render charts after becoming visible
                 setTimeout(() => renderCharts(summaryData.categories || []), 50);
             }
         });
@@ -283,11 +309,4 @@ function emptyState(icon, text) {
 function showEmptyAll(msg) {
     document.getElementById("transactionsList").innerHTML = emptyState("⚠️", msg);
     document.getElementById("debtsList").innerHTML = emptyState("⚠️", msg);
-}
-
-function showToast(msg) {
-    const t = document.getElementById("toast");
-    t.textContent = msg;
-    t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 3000);
 }

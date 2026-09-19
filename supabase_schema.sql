@@ -5,9 +5,15 @@ CREATE TABLE IF NOT EXISTS users (
     user_id BIGINT PRIMARY KEY,
     username TEXT,
     first_name TEXT,
+    last_name TEXT,
+    photo_url TEXT,
     currency TEXT DEFAULT 'UZS',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- If users table already exists, add columns if missing
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;
 
 -- Transactions table
 CREATE TABLE IF NOT EXISTS transactions (
@@ -44,7 +50,7 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE debts ENABLE ROW LEVEL SECURITY;
 
--- Allow all operations (bot uses service key or anon key - adjust as needed)
+-- Allow all operations
 CREATE POLICY "Allow all for users" ON users FOR ALL USING (true);
 CREATE POLICY "Allow all for transactions" ON transactions FOR ALL USING (true);
 CREATE POLICY "Allow all for debts" ON debts FOR ALL USING (true);
