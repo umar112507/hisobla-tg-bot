@@ -25,7 +25,9 @@ if (tg) {
 let expenseChartInstance = null;
 let incomeChartInstance = null;
 let allTransactions = [];
+let allDebts = [];
 let currentFilter = "all";
+let currentDebtFilter = "all";
 let summaryData = null;
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -104,8 +106,8 @@ async function loadTransactions() {
 async function loadDebts() {
     try {
         const res = await fetch(`${API_BASE}/api/debts?user_id=${USER_ID}`);
-        const debts = await res.json();
-        renderDebts(debts);
+        allDebts = await res.json();
+        renderDebts(allDebts);
     } catch (e) {
         console.error("Debts load error:", e);
         document.getElementById("debtsList").innerHTML = emptyState("💳", "Qarzlar yuklanmadi");
@@ -194,11 +196,25 @@ function renderDebts(debts) {
       <div class="debt-sum-amount received">${formatAmount(totalReceived)}</div>
     </div>`;
 
-    container.innerHTML = debts.map(d => {
+    const filteredDebts = currentDebtFilter === "all"
+        ? debts
+        : debts.filter(d => d.direction === currentDebtFilter);
+
+    if (!filteredDebts.length) {
+        container.innerHTML = emptyState("💳", "Ushbu turdagi qarzlar yo'q!");
+        return;
+    }
+
+    container.innerHTML = filteredDebts.map(d => {
         let days = null;
         if (d.due_date) {
-            const diffTime = new Date(d.due_date).getTime() - new Date().getTime();
-            days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const todayDate = new Date();
+            todayDate.setHours(0, 0, 0, 0);
+            const dueDate = new Date(d.due_date);
+            dueDate.setHours(0, 0, 0, 0);
+
+            const diffTime = dueDate.getTime() - todayDate.getTime();
+            days = Math.round(diffTime / (1000 * 60 * 60 * 24));
         }
 
         let urgencyClass = "ok";
@@ -209,21 +225,21 @@ function renderDebts(debts) {
             if (days < 0) {
                 urgencyClass = "overdue";
                 deadlineClass = "overdue";
-                deadlineText = `⚠️ Muddati ${Math.abs(days)} kun oldin o'tgan!`;
+                deadlineText = `⚠️ Muddati ${Math.abs(days)} kun oldin o'tgan! (${formatDate(d.due_date)})`;
             } else if (days === 0) {
                 urgencyClass = "overdue";
                 deadlineClass = "overdue";
-                deadlineText = "🔴 Bugun muddati!";
+                deadlineText = `🔴 Bugun muddati! (${formatDate(d.due_date)})`;
             } else if (days <= 3) {
                 urgencyClass = "due-soon";
                 deadlineClass = "due-soon";
-                deadlineText = `🟠 ${days} kun qoldi`;
+                deadlineText = `🟠 ${days} kun qoldi (${formatDate(d.due_date)})`;
             } else {
-                deadlineText = `🟢 ${days} kun qoldi`;
+                deadlineText = `🟢 ${days} kun qoldi (${formatDate(d.due_date)})`;
             }
         }
 
-        const dirText = d.direction === "gave" ? "Berdim" : "Oldim";
+        const dirText = d.direction === "gave" ? "📤 Berdim" : "📥 Oldim";
         return `
       <div class="debt-item ${urgencyClass}">
         <div class="debt-header">
@@ -310,10 +326,18 @@ function setupTabs() {
 function setupFilters() {
     document.querySelectorAll(".filter-btn").forEach(btn => {
         btn.addEventListener("click", () => {
-            document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
-            currentFilter = btn.dataset.filter;
-            renderTransactions(allTransactions);
+            if (btn.dataset.filter) {
+                document.querySelectorAll(".filter-btn[data-filter]").forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+                currentFilter = btn.dataset.filter;
+                renderTransactions(allTransactions);
+            }
+            if (btn.dataset.debtFilter) {
+                document.querySelectorAll(".debt-filter-btn").forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+                currentDebtFilter = btn.dataset.debtFilter;
+                renderDebts(allDebts);
+            }
         });
     });
 }

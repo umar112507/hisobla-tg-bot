@@ -58,40 +58,35 @@ Faqat mos kategoriya nomini qaytaring. JSON: {"category": "Kategoriya"}`;
 }
 
 export async function parseIntent(text: string, summaryContext?: any) {
-    const prompt = `Siz "Hisobla" botining moliyaviy AI yordamchisiz.
-Matnni tahlil qiling va SUMMA, TURI (income yoki expense) VA TAVSIFNI aniqlang.
+    const today = new Date().toISOString().split("T")[0];
 
-MUHIM QOIDALAR:
-1. DAROMAD (income): "oylik", "maosh", "zarplata", "avans", "stipendiya", "tushum", "ishhaqi", "pul tushdi", "oldim", "daromad", "bonus", "freelance" kabi so'zlar bo'lsa -> intent: "income"
-2. XARAJA (expense): "taksi", "ovqat", "do'kon", "ishlatdim", "ketdi", "sarfladim", "to'ladim", "xarajat", "harajat", "bozor" -> intent: "expense"
+    const prompt = `Siz "Hisobla" moliyaviy AI yordamchisiz. Bugungi sana: ${today}.
+Matnni chuqur tahlil qiling va qarz, xarajat yoki daromad ekanligini ajrating.
 
-MUHIM SO'Z SHAKLLARI:
-- "ming" / "k" = 000 (masalan: "10 ming" -> 10000, "50k" -> 50000)
-- "mln" / "million" = 000000 (masalan: "2 mln" -> 2000000, "1.5 million" -> 1500000)
+QARZ QOIDALARI:
+1. QARZ BERILDI ("debt_gave"): Men kimgadir qarz bergan bo'lsam (masalan: "Ali ga 500000 qarz berdim", "Sardor 100 ming oldi", "Javohirga 200k berildi") -> intent: "debt_gave"
+2. QARZ OLINDI ("debt_received"): Men kimdandir qarz olgan bo'lsam (masalan: "Validan 200 ming qarz oldim", "Sobir menga 500k qarz berdi") -> intent: "debt_received"
+
+MUDDAT (due_date):
+- Agar muddat aytilgan bo'lsa (masalan: "10 kunga", "oy oxirigacha", "15-oktyabrgacha"), uni YYYY-MM-DD formatida hisoblab chiqaring.
+- Aks holda null.
+
+NUMERIK SHAKLLAR:
+- "ming" / "k" = 000 (10 ming -> 10000)
+- "mln" / "million" = 000000 (2 mln -> 2000000)
 
 Matn: "${text}"
 
 JSON qaytaring:
-- Daromad bo'lsa (masalan: "2 mln oylik", "oylik 3000000", "500$ oldim"):
-{
-  "intent": "income",
-  "amount": 2000000,
-  "description": "oylik"
-}
-
-- Xarajat bo'lsa (masalan: "10 ming taksiga ishlatdim", "taksi 15000"):
-{
-  "intent": "expense",
-  "amount": 10000,
-  "description": "taksi"
-}
-
-- Qarz berilsa: {"intent": "debt_gave", "person": "Ism", "amount": 500000}
-- Qarz olinsa: {"intent": "debt_received", "person": "Ism", "amount": 200000}
+- Qarz berildi: {"intent": "debt_gave", "person": "Ali", "amount": 500000, "due_date": "YYYY-MM-DD yoki null"}
+- Qarz olindi: {"intent": "debt_received", "person": "Vali", "amount": 200000, "due_date": "YYYY-MM-DD yoki null"}
+- Daromad: {"intent": "income", "amount": 2000000, "description": "oylik"}
+- Xarajat: {"intent": "expense", "amount": 10000, "description": "taksi"}
 - Hisobot: {"intent": "report"}
 - Qarzlar: {"intent": "debts_list"}
+- Muloqot: {"intent": "ai_reply", "reply": "Matn..."}
 
-Faqat valid JSON qaytaring.`;
+Faqat JSON qaytaring.`;
 
     try {
         if (GROQ_API_KEY) {
@@ -113,7 +108,7 @@ Faqat valid JSON qaytaring.`;
             const match = content.match(/\{.*?\}/s);
             if (match) {
                 const parsed = JSON.parse(match[0]);
-                if (parsed.intent && parsed.amount) return parsed;
+                if (parsed.intent) return parsed;
             }
         }
     } catch (e) {
@@ -127,48 +122,59 @@ Faqat valid JSON qaytaring.`;
 function fallbackRegexParser(text: string) {
     const lower = text.toLowerCase();
 
-    // Parse amount with "ming", "mln", "k"
+    // Parse amount
     let amount: number | null = null;
-
     const mlnMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:mln|million)/);
-    if (mlnMatch) {
-        amount = parseFloat(mlnMatch[1]) * 1000000;
-    }
+    if (mlnMatch) amount = parseFloat(mlnMatch[1]) * 1000000;
 
     if (!amount) {
         const mingMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:ming|k)/);
-        if (mingMatch) {
-            amount = parseFloat(mingMatch[1]) * 1000;
-        }
+        if (mingMatch) amount = parseFloat(mingMatch[1]) * 1000;
     }
 
     if (!amount) {
         const digitMatch = lower.match(/\b\d{3,9}\b/);
-        if (digitMatch) {
-            amount = parseFloat(digitMatch[0]);
-        }
+        if (digitMatch) amount = parseFloat(digitMatch[0]);
     }
 
+    // Parse relative due date (e.g., "10 kunga")
+    let dueDate: string | null = null;
+    const daysMatch = lower.match(/(\d+)\s*kun/);
+    if (daysMatch) {
+        const days = parseInt(daysMatch[1]);
+        const d = new Date();
+        d.setDate(d.getDate() + days);
+        dueDate = d.toISOString().split("T")[0];
+    }
+
+    // Parse person name
+    let person = "Noma'lum";
+    const personMatch = text.match(/([A-Z][a-z]+|Ali|Vali|Sardor|Javohir|Sobir|Botiro|Aziz|Jasur)/);
+    if (personMatch) person = personMatch[0];
+
     if (amount) {
-        // INCOME KEYWORDS: oylik, maosh, zarplata, avans, stipendiya, tushum, ishhaqi, daromad, bonus, freelance
+        // DEBT GAVE: qarz berdim, berdim, qarz berildi, berib turdim
+        if (/qarz ber|berdim|berildi|berib tur/i.test(lower)) {
+            return { intent: "debt_gave", person, amount, due_date: dueDate };
+        }
+
+        // DEBT RECEIVED: qarz oldim, qarz berdi, oldim, olindi
+        if (/qarz ol|oldim|olindi|menga berdi/i.test(lower)) {
+            return { intent: "debt_received", person, amount, due_date: dueDate };
+        }
+
+        // INCOME
         if (/oylik|maosh|zarplata|avans|stipendiya|tushum|ishhaqi|daromad|bonus|freelance|tushdi/i.test(lower)) {
-            const desc = text
-                .replace(/(\d+[\d\s\.]*)\s*(?:ming|k|mln|million|so'm)?/gi, "")
-                .replace(/tushdi|oldim|keldi|berishdi/gi, "")
-                .trim();
+            const desc = text.replace(/(\d+[\d\s\.]*)\s*(?:ming|k|mln|million|so'm)?/gi, "").replace(/tushdi|oldim|keldi/gi, "").trim();
             return { intent: "income", amount, description: desc || "oylik" };
         }
 
-        // EXPENSE KEYWORDS: ishlatdim, ketdi, sarfladim, taksi, ovqat, do'kon, bozor, tushlik, xarajat, harajat, to'ladim
-        if (/ishlatdim|ketdi|sarfladim|taksi|ovqat|do'kon|bozor|tushlik|xarajat|harajat|to'ladim|berdim/i.test(lower)) {
-            const desc = text
-                .replace(/(\d+[\d\s\.]*)\s*(?:ming|k|mln|million|so'm)?/gi, "")
-                .replace(/ishlatdim|ketdi|sarfladim|to'ladim/gi, "")
-                .trim();
+        // EXPENSE
+        if (/ishlatdim|ketdi|sarfladim|taksi|ovqat|do'kon|bozor|tushlik|xarajat|harajat|to'ladim/i.test(lower)) {
+            const desc = text.replace(/(\d+[\d\s\.]*)\s*(?:ming|k|mln|million|so'm)?/gi, "").replace(/ishlatdim|ketdi|sarfladim|to'ladim/gi, "").trim();
             return { intent: "expense", amount, description: desc || "xarajat" };
         }
 
-        // Default if number provided without strong keywords
         return { intent: "expense", amount, description: text };
     }
 
@@ -177,6 +183,6 @@ function fallbackRegexParser(text: string) {
 
     return {
         intent: "ai_reply",
-        reply: "🤖 Tushundim! Xarajat yoki daromadingizni kiritishingiz mumkin (masalan: <i>2 mln oylik</i> yoki <i>15000 taksi</i>)."
+        reply: "🤖 Tushundim! Masalan: <i>Ali ga 500 ming qarz berdim 10 kunga</i> deb yozishingiz mumkin."
     };
 }
