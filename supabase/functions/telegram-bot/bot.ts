@@ -3,7 +3,7 @@ import { ensureUser, addTransaction, addDebt, getDebts, getSummary } from "./db.
 import { categorizeTransaction, parseIntent } from "./ai.ts";
 
 const BOT_TOKEN = Deno.env.get("BOT_TOKEN") || "";
-const MINI_APP_URL = Deno.env.get("MINI_APP_URL") || "https://hisoblatg.netlify.app";
+const MINI_APP_URL = Deno.env.get("MINI_APP_URL") || "https://umar112507.github.io/hisobla-tg-bot/mini_app/";
 
 export const bot = new Bot(BOT_TOKEN);
 
@@ -13,20 +13,17 @@ bot.command("start", async (ctx) => {
     await ensureUser(user.id, user.username, user.first_name, user.last_name);
 
     const kb = new InlineKeyboard()
-        .webApp("📊 Mini App", `${MINI_APP_URL}?user_id=${user.id}`)
-        .row()
-        .text("💸 Xarajat", "btn_expense")
-        .text("💰 Daromad", "btn_income")
-        .row()
-        .text("💳 Qarz", "btn_debt")
-        .text("📋 Qarzlar", "btn_debts")
-        .row()
-        .text("📊 Hisobot", "btn_report");
+        .webApp("📊 Mini App-ni ochishV", `${MINI_APP_URL}?user_id=${user.id}`);
 
     await ctx.reply(
         `👋 Salom, <b>${user.first_name || "Do'stim"}</b>!\n\n` +
-        `🏦 <b>Hisobla Bot</b> (Supabase Edge Function + AI) ga xush kelibsiz!\n\n` +
-        `Har qanday matnni menga yozishingiz mumkin (masalan: <i>"10 ming taksiga ishlatdim"</i>, <i>"2 mln oylik"</i>, <i>"Ali ga 100$ berdim"</i>).`,
+        `🏦 <b>Hisobla AI Bot</b> ga xush kelibsiz!\n\n` +
+        `Har qanday moliyaviy xabar yoki qarzni menga yozishingiz mumkin:\n` +
+        `• <i>"10 ming taksiga sarfladim"</i>\n` +
+        `• <i>"2 mln oylik oldim"</i>\n` +
+        `• <i>"Ali ga 500 ming qarz berdim 10 kunga"</i>\n` +
+        `• <i>"Sardordan 200 ming qarz oldim"</i>\n\n` +
+        `Barcha hisoblarni ko'rish uchun pastdagi tugmani bosing 👇`,
         { parse_mode: "HTML", reply_markup: kb }
     );
 });
