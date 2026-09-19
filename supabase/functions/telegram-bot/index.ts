@@ -1,4 +1,4 @@
-import { webhookCallback } from "https://deno.land/x/grammy@v1.27.0/mod.ts";
+import { webhookCallback } from "https://esm.sh/grammy@1.27.0";
 import { bot } from "./bot.ts";
 
 const handleUpdate = webhookCallback(bot, "std/http");

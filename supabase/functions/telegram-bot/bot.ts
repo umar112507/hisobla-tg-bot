@@ -1,4 +1,4 @@
-import { Bot, InlineKeyboard } from "https://deno.land/x/grammy@v1.27.0/mod.ts";
+import { Bot, InlineKeyboard } from "https://esm.sh/grammy@1.27.0";
 import { ensureUser, addTransaction, addDebt, getDebts, getSummary } from "./db.ts";
 import { categorizeTransaction, parseIntent } from "./ai.ts";
 
