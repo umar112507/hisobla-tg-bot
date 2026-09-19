@@ -29,7 +29,6 @@ let allDebts = [];
 let currentFilter = "all";
 let currentDebtFilter = "active";
 let summaryData = null;
-let autoRefreshTimer = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     renderUserProfile();
@@ -40,20 +39,12 @@ document.addEventListener("DOMContentLoaded", () => {
     loadAll(false);
     setupTabs();
     setupFilters();
-    setupSmartSync();
+    setupPureEventSync();
 });
 
-// ─── Smart Event-Based Sync (DB Resource Optimized) ───────────
-function setupSmartSync() {
-    // Low-frequency background polling (every 15 seconds) to save DB quota
-    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-    autoRefreshTimer = setInterval(() => {
-        if (!document.hidden) {
-            loadAll(true);
-        }
-    }, 15000);
-
-    // Instant update when user switches back to Mini App tab or window
+// ─── Pure Event-Driven Sync (Zero Polling Timers) ─────────────
+function setupPureEventSync() {
+    // Update data ONLY when user switches back to Mini App tab or window
     document.addEventListener("visibilitychange", () => {
         if (!document.hidden) loadAll(true);
     });
