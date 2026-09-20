@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS users (
 -- If users table already exists, add columns if missing
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS usage_count INT DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS usage_reset_date TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;
 
 -- Transactions table
 CREATE TABLE IF NOT EXISTS transactions (

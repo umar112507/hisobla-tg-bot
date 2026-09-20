@@ -1,5 +1,5 @@
 import { Bot, InlineKeyboard } from "https://esm.sh/grammy@1.27.0";
-import { ensureUser, addTransaction, addDebt, getDebts, getSummary } from "./db.ts";
+import { ensureUser, addTransaction, addDebt, getDebts, getSummary, checkAndIncrementUsage } from "./db.ts";
 import { categorizeTransaction, parseIntent, transcribeAudio } from "./ai.ts";
 
 const BOT_TOKEN = Deno.env.get("BOT_TOKEN") || "";
@@ -66,6 +66,16 @@ bot.on("message:text", async (ctx) => {
     const user = ctx.from;
     await ensureUser(user.id, user.username, user.first_name, user.last_name);
 
+    // Bepul xabarlar limitini tekshirish
+    const canUse = await checkAndIncrementUsage(user.id);
+    if (!canUse) {
+        await ctx.reply("⚠️ <b>Haftalik limit tugadi!</b>\n\nSiz haftalik bepul beriladigan 10 ta xabar limitidan foydalanib bo'ldingiz.\n\nCheksiz yozish, ovozli xabarlar va eksklyuziv imkoniyatlardan foydalanish uchun <b>Premium</b> xarid qiling! (Tez orada inpay.uz orqali to'lov qo'shiladi)", {
+            parse_mode: "HTML",
+            reply_markup: new InlineKeyboard().url("👑 Premium", "https://t.me/umar112507")
+        });
+        return;
+    }
+
     // Send typing chat action
     await ctx.replyWithChatAction("typing");
     await processIntent(ctx, user, text);
@@ -75,26 +85,7 @@ bot.on("message:voice", async (ctx) => {
     const user = ctx.from;
     await ensureUser(user.id, user.username, user.first_name, user.last_name);
 
-    await ctx.replyWithChatAction("typing");
-
-    try {
-        const msg = await ctx.reply("🎙️ <i>Ovozli xabar eshitilmoqda...</i>", { parse_mode: "HTML" });
-
-        const file = await ctx.getFile();
-        const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
-
-        const text = await transcribeAudio(fileUrl);
-        if (!text) {
-            await ctx.api.editMessageText(ctx.chat.id, msg.message_id, "❌ Ovozli xabarni tushunib bo'lmadi.");
-            return;
-        }
-
-        await ctx.api.editMessageText(ctx.chat.id, msg.message_id, `🎙️ <i>"${text}"</i>`, { parse_mode: "HTML" });
-        await processIntent(ctx, user, text);
-    } catch (e) {
-        console.error("Voice parse error:", e);
-        await ctx.reply("❌ Ovozli xabarni yuklashda xatolik yuz berdi.");
-    }
+    await ctx.reply("🎙️ Tez orada ovozli xabar orqali hisoblash ishga tushiriladi!\n\nIltimos, hozircha xarajatlaringizni yozma ravishda kiriting. Bizni qo'llab-quvvatlayotganingiz uchun rahmat, siz eng zo'risiz! 😊");
 });
 
 async function processIntent(ctx: any, user: any, text: string) {

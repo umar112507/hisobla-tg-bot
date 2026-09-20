@@ -101,3 +101,47 @@ export async function getSummary(userId: number) {
         balance: totalIncome - totalExpense,
     };
 }
+
+export async function checkAndIncrementUsage(userId: number): Promise<boolean> {
+    try {
+        const { data: user, error } = await supabase
+            .from("users")
+            .select("usage_count, usage_reset_date, is_premium")
+            .eq("user_id", userId)
+            .single();
+
+        // Agar ustunlar DB ga hali qo'shilmagan bo'lsa xatolik beradi va ishlashda davom etadi
+        if (error || !user) {
+            return true;
+        }
+
+        if (user.is_premium) return true;
+
+        const now = new Date();
+        const resetDate = user.usage_reset_date ? new Date(user.usage_reset_date) : now;
+
+        const diffDays = (now.getTime() - resetDate.getTime()) / (1000 * 3600 * 24);
+
+        let newCount = user.usage_count || 0;
+        let newResetDate = user.usage_reset_date || now.toISOString();
+
+        if (diffDays >= 7) {
+            newCount = 0;
+            newResetDate = now.toISOString();
+        }
+
+        if (newCount >= 10) {
+            return false; // Limit tugadi
+        }
+
+        // Limit o'tmagan bo'lsa sanoqni +1 ga oshiramiz
+        await supabase.from("users").update({
+            usage_count: newCount + 1,
+            usage_reset_date: newResetDate
+        }).eq("user_id", userId);
+
+        return true;
+    } catch (e) {
+        return true;
+    }
+}
