@@ -186,3 +186,32 @@ function fallbackRegexParser(text: string) {
         reply: "🤖 Tushundim! Masalan: <i>Ali ga 500 ming qarz berdim 10 kunga</i> deb yozishingiz mumkin."
     };
 }
+
+export async function transcribeAudio(fileUrl: string): Promise<string | null> {
+    if (!GROQ_API_KEY) return null;
+
+    try {
+        const audioRes = await fetch(fileUrl);
+        if (!audioRes.ok) throw new Error("Failed to download audio from Telegram");
+
+        const audioBlob = await audioRes.blob();
+
+        const formData = new FormData();
+        formData.append("file", audioBlob, "voice.ogg");
+        formData.append("model", "whisper-large-v3");
+
+        const groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${GROQ_API_KEY}`,
+            },
+            body: formData,
+        });
+
+        const data = await groqRes.json();
+        return data.text || null;
+    } catch (e) {
+        console.error("Groq transcript error:", e);
+        return null;
+    }
+}

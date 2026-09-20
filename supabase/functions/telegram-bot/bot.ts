@@ -1,6 +1,6 @@
 import { Bot, InlineKeyboard } from "https://esm.sh/grammy@1.27.0";
 import { ensureUser, addTransaction, addDebt, getDebts, getSummary } from "./db.ts";
-import { categorizeTransaction, parseIntent } from "./ai.ts";
+import { categorizeTransaction, parseIntent, transcribeAudio } from "./ai.ts";
 
 const BOT_TOKEN = Deno.env.get("BOT_TOKEN") || "";
 const MINI_APP_URL = Deno.env.get("MINI_APP_URL") || "https://umar112507.github.io/hisobla-tg-bot/mini_app/";
@@ -68,7 +68,36 @@ bot.on("message:text", async (ctx) => {
 
     // Send typing chat action
     await ctx.replyWithChatAction("typing");
+    await processIntent(ctx, user, text);
+});
 
+bot.on("message:voice", async (ctx) => {
+    const user = ctx.from;
+    await ensureUser(user.id, user.username, user.first_name, user.last_name);
+
+    await ctx.replyWithChatAction("typing");
+
+    try {
+        const msg = await ctx.reply("🎙️ <i>Ovozli xabar eshitilmoqda...</i>", { parse_mode: "HTML" });
+
+        const file = await ctx.getFile();
+        const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+
+        const text = await transcribeAudio(fileUrl);
+        if (!text) {
+            await ctx.api.editMessageText(ctx.chat.id, msg.message_id, "❌ Ovozli xabarni tushunib bo'lmadi.");
+            return;
+        }
+
+        await ctx.api.editMessageText(ctx.chat.id, msg.message_id, `🎙️ <i>"${text}"</i>`, { parse_mode: "HTML" });
+        await processIntent(ctx, user, text);
+    } catch (e) {
+        console.error("Voice parse error:", e);
+        await ctx.reply("❌ Ovozli xabarni yuklashda xatolik yuz berdi.");
+    }
+});
+
+async function processIntent(ctx: any, user: any, text: string) {
     const summary = await getSummary(user.id);
     const parsed = await parseIntent(text, summary);
 
@@ -91,7 +120,7 @@ bot.on("message:text", async (ctx) => {
     } else {
         await ctx.reply("🤖 Tushundim! Xarajat yoki daromadingizni kiritishingiz mumkin.");
     }
-});
+}
 
 async function handleExpense(ctx: any, text: string) {
     const user = ctx.from!;
