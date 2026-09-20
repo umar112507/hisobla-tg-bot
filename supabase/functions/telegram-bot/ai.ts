@@ -199,6 +199,7 @@ export async function transcribeAudio(fileUrl: string): Promise<string | null> {
         const formData = new FormData();
         formData.append("file", audioBlob, "voice.ogg");
         formData.append("model", "whisper-large-v3");
+        formData.append("language", "uz"); // Force target language to Uzbek
 
         const groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
             method: "POST",
