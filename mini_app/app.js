@@ -188,12 +188,14 @@ function renderTransactions(transactions) {
 
     container.innerHTML = filtered.map(t => {
         const isIncome = t.type === "income";
-        const emoji = isIncome ? "💰" : "💸";
+        const svgIcon = isIncome
+            ? `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>`
+            : `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></svg>`;
         const dateStr = formatDate(t.created_at);
         const sign = isIncome ? "+" : "-";
         return `
       <div class="tx-item">
-        <div class="tx-icon-wrap ${t.type}">${emoji}</div>
+        <div class="tx-icon-wrap ${t.type}">${svgIcon}</div>
         <div class="tx-info">
           <div class="tx-desc">${escHtml(t.description || "—")}</div>
           <div class="tx-meta">
@@ -203,7 +205,9 @@ function renderTransactions(transactions) {
         </div>
         <div class="tx-right">
           <div class="tx-amount ${t.type}">${sign}${formatAmount(t.amount)}</div>
-          <button class="tx-delete-btn" onclick="deleteTx('${t.id}')" title="O'chirish">🗑️</button>
+          <button class="tx-delete-btn" onclick="deleteTx('${t.id}')" title="O'chirish">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
         </div>
       </div>`;
     }).join("");
@@ -459,13 +463,15 @@ function escHtml(str) {
         .replace(/>/g, "&gt;");
 }
 
-function emptyState(icon, text) {
-    return `<div class="empty-state"><div class="empty-state-icon">${icon}</div><div class="empty-state-text">${text}</div></div>`;
+function emptyState(iconSvg, text) {
+    const defaultSvg = `<svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>`;
+    return `<div class="empty-state"><div class="empty-state-icon">${iconSvg || defaultSvg}</div><div class="empty-state-text">${text}</div></div>`;
 }
 
 function showEmptyAll(msg) {
-    document.getElementById("transactionsList").innerHTML = emptyState("⚠️", msg);
-    document.getElementById("debtsList").innerHTML = emptyState("⚠️", msg);
+    const warningSvg = `<svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-red)"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+    document.getElementById("transactionsList").innerHTML = emptyState(warningSvg, msg);
+    document.getElementById("debtsList").innerHTML = emptyState(warningSvg, msg);
 }
 
 // ─── Premium Actions ──────────────────────────────────────────

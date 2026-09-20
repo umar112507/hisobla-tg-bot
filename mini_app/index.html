@@ -59,7 +59,13 @@
         <div class="balance-amount" id="balanceAmount">—</div>
         <div class="balance-stats">
           <div class="stat-item income-stat">
-            <div class="stat-icon">📈</div>
+            <div class="stat-icon-wrap income">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="7" y1="17" x2="17" y2="7" />
+                <polyline points="7 7 17 7 17 17" />
+              </svg>
+            </div>
             <div class="stat-info">
               <span class="stat-label">Daromad</span>
               <span class="stat-value" id="totalIncome">—</span>
@@ -67,7 +73,13 @@
           </div>
           <div class="stat-divider"></div>
           <div class="stat-item expense-stat">
-            <div class="stat-icon">📉</div>
+            <div class="stat-icon-wrap expense">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="7" y1="7" x2="17" y2="17" />
+                <polyline points="17 7 17 17 7 17" />
+              </svg>
+            </div>
             <div class="stat-info">
               <span class="stat-label">Xarajat</span>
               <span class="stat-value" id="totalExpense">—</span>
@@ -80,13 +92,32 @@
     <!-- Navigation Tabs -->
     <nav class="tabs">
       <button class="tab-btn active" data-tab="transactions">
-        <span>📋</span> Tranzaksiyalar
+        <svg class="tab-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+          <polyline points="10 9 9 9 8 9" />
+        </svg>
+        <span>Tranzaksiyalar</span>
       </button>
       <button class="tab-btn" data-tab="debts">
-        <span>💳</span> Qarzlar
+        <svg class="tab-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+          <line x1="1" y1="10" x2="23" y2="10" />
+        </svg>
+        <span>Qarzlar</span>
       </button>
       <button class="tab-btn" data-tab="statistics">
-        <span>📊</span> Statistika
+        <svg class="tab-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
+        <span>Statistika</span>
       </button>
     </nav>
 
@@ -94,8 +125,8 @@
     <div class="tab-content active" id="tab-transactions">
       <div class="filter-row">
         <button class="filter-btn active" data-filter="all">Hammasi</button>
-        <button class="filter-btn" data-filter="income">💰 Daromad</button>
-        <button class="filter-btn" data-filter="expense">💸 Xarajat</button>
+        <button class="filter-btn" data-filter="income"><span class="filter-dot green"></span> Daromad</button>
+        <button class="filter-btn" data-filter="expense"><span class="filter-dot red"></span> Xarajat</button>
       </div>
       <div class="list-container" id="transactionsList">
         <div class="loading-state">
@@ -110,9 +141,12 @@
       <div class="debt-summary-row" id="debtSummary"></div>
       <div class="filter-row">
         <button class="debt-filter-btn filter-btn active" data-debt-filter="active">Faol qarzlar</button>
-        <button class="debt-filter-btn filter-btn" data-debt-filter="gave">📤 Berganlarim</button>
-        <button class="debt-filter-btn filter-btn" data-debt-filter="received">📥 Olganlarim</button>
-        <button class="debt-filter-btn filter-btn" data-debt-filter="paid">✅ To'langanlar</button>
+        <button class="debt-filter-btn filter-btn" data-debt-filter="gave"><span class="filter-dot red"></span>
+          Berganlarim</button>
+        <button class="debt-filter-btn filter-btn" data-debt-filter="received"><span class="filter-dot green"></span>
+          Olganlarim</button>
+        <button class="debt-filter-btn filter-btn" data-debt-filter="paid"><span class="filter-dot blue"></span>
+          To'langanlar</button>
       </div>
       <div class="list-container" id="debtsList">
         <div class="loading-state">
@@ -150,7 +184,15 @@
 
       <!-- Coupon Activation Form -->
       <div class="coupon-activate-card glass-card">
-        <div class="coupon-header">🎟️ Promo-kod (Kupon) bormi?</div>
+        <div class="coupon-header">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" style="color:var(--gold)">
+            <path
+              d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z" />
+            <line x1="12" y1="6" x2="12" y2="18" stroke-dasharray="2 2" />
+          </svg>
+          <span>Promo-kod (Kupon) bormi?</span>
+        </div>
         <div class="coupon-input-wrap">
           <input type="text" id="userCouponCode" placeholder="Masalan: HISOBLA50" />
           <button class="coupon-activate-btn" onclick="activateCoupon()">Faollashtirish</button>
