@@ -225,8 +225,13 @@ body {
   gap: 6px;
 }
 
-.logo-icon {
-  font-size: 20px;
+.logo-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  mix-blend-mode: lighten;
+  /* Orqa fonni (qora/to'q rangni) o'chirib, faqat yorug' logoni qoldiradi */
+  border-radius: 4px;
 }
 
 .logo-text {
