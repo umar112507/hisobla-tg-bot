@@ -6,169 +6,316 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hisobla – Admin Panel</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
         rel="stylesheet" />
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="admin.css" />
 </head>
 
 <body>
-    <!-- Auth Secret Modal (Shown when not authenticated) -->
-    <div class="auth-overlay" id="authOverlay">
-        <div class="auth-card glass-card">
-            <div class="auth-icon">🔒</div>
-            <h2>Admin Panelga Kirish</h2>
-            <p>Admin huquqini tasdiqlash uchun Maxfiy Parol (Secret Key)ni kiriting:</p>
-            <div class="auth-form">
-                <input type="password" id="secretInput" placeholder="Maxfiy parolni kiriting..." />
-                <button class="auth-btn" onclick="authenticateAdmin()">Kirish 🚀</button>
-            </div>
-            <div class="auth-error" id="authError"></div>
+
+    <!-- ACCESS DENIED OVERLAY -->
+    <div class="denied-overlay hidden" id="deniedOverlay">
+        <div class="denied-card">
+            <div class="denied-icon">🚫</div>
+            <h2>Kirish Taqiqlangan</h2>
+            <p id="deniedText">Ushbu sahifa faqat adminlar uchun.</p>
         </div>
     </div>
 
-    <!-- Header -->
-    <header class="admin-header">
-        <div class="admin-header-content">
-            <div class="admin-brand">
-                <span class="admin-logo">⚙️</span>
-                <span class="admin-title">Hisobla Admin</span>
-            </div>
-            <div class="admin-user-wrap">
-                <div class="admin-user" id="adminUser">Admin</div>
-                <button class="logout-btn" onclick="logoutAdmin()" title="Chiqish">🚪</button>
+    <!-- LOADING SCREEN -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-logo">⚙️</div>
+        <div class="loading-text">Tekshirilmoqda...</div>
+        <div class="loading-bar">
+            <div class="loading-bar-fill"></div>
+        </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <span class="sidebar-logo-icon">⚙️</span>
+                <div>
+                    <div class="sidebar-title">Hisobla</div>
+                    <div class="sidebar-subtitle">Admin Panel</div>
+                </div>
             </div>
         </div>
-    </header>
 
-    <main class="admin-main">
-
-        <!-- Stats Overview -->
-        <section class="stats-grid" id="statsGrid">
-            <div class="stat-card glass-card">
-                <div class="stat-emoji">👥</div>
-                <div class="stat-number" id="statUsers">—</div>
-                <div class="stat-label">Foydalanuvchilar</div>
-            </div>
-            <div class="stat-card glass-card">
-                <div class="stat-emoji">👑</div>
-                <div class="stat-number" id="statPremium">—</div>
-                <div class="stat-label">Premium</div>
-            </div>
-            <div class="stat-card glass-card">
-                <div class="stat-emoji">📋</div>
-                <div class="stat-number" id="statTransactions">—</div>
-                <div class="stat-label">Tranzaksiyalar</div>
-            </div>
-            <div class="stat-card glass-card">
-                <div class="stat-emoji">🎟️</div>
-                <div class="stat-number" id="statCoupons">—</div>
-                <div class="stat-label">Faol kuponlar</div>
-            </div>
-        </section>
-
-        <!-- Admin Tabs -->
-        <nav class="admin-tabs">
-            <button class="admin-tab-btn active" data-tab="users">👥 Foydalanuvchilar</button>
-            <button class="admin-tab-btn" data-tab="coupons">🎟️ Kuponlar</button>
+        <nav class="sidebar-nav">
+            <a class="nav-item active" data-page="dashboard" href="#">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Dashboard</span>
+            </a>
+            <a class="nav-item" data-page="users" href="#">
+                <span class="nav-icon">👥</span>
+                <span class="nav-label">Foydalanuvchilar</span>
+                <span class="nav-badge" id="navBadgeUsers">0</span>
+            </a>
+            <a class="nav-item" data-page="coupons" href="#">
+                <span class="nav-icon">🎟️</span>
+                <span class="nav-label">Kuponlar</span>
+            </a>
+            <a class="nav-item" data-page="broadcast" href="#">
+                <span class="nav-icon">📣</span>
+                <span class="nav-label">Broadcast</span>
+            </a>
         </nav>
 
-        <!-- Users Tab -->
-        <div class="admin-tab-content active" id="tab-users">
-            <div class="section-header">
-                <h3>👥 Barcha foydalanuvchilar</h3>
-                <input type="text" class="search-input" id="userSearch"
-                    placeholder="🔍 Qidirish (ism, username, ID)..." />
+        <div class="sidebar-footer">
+            <div class="admin-chip" id="adminChip">
+                <span class="admin-chip-dot"></span>
+                <span id="adminChipName">Admin</span>
             </div>
-            <div class="table-wrap">
-                <table class="admin-table" id="usersTable">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Ism</th>
-                            <th>Username</th>
-                            <th>Holat</th>
-                            <th>Xabarlar</th>
-                            <th>Ro'yxatdan</th>
-                            <th>Boshqarish</th>
-                        </tr>
-                    </thead>
-                    <tbody id="usersTableBody">
-                        <tr>
-                            <td colspan="7" class="loading-cell">Yuklanmoqda...</td>
-                        </tr>
-                    </tbody>
-                </table>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-wrap">
+
+        <!-- TOP BAR -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="menu-btn" id="menuBtn" onclick="toggleSidebar()">☰</button>
+                <h1 class="page-title" id="pageTitle">Dashboard</h1>
+            </div>
+            <div class="topbar-right">
+                <button class="refresh-btn" onclick="refreshPage()" title="Yangilash">🔄</button>
+            </div>
+        </header>
+
+        <!-- PAGE: DASHBOARD -->
+        <div class="page active" id="page-dashboard">
+            <!-- KPI Cards -->
+            <div class="kpi-grid">
+                <div class="kpi-card kpi-blue">
+                    <div class="kpi-icon">👥</div>
+                    <div class="kpi-info">
+                        <div class="kpi-value" id="kpiUsers">—</div>
+                        <div class="kpi-label">Jami Userlar</div>
+                    </div>
+                    <div class="kpi-glow"></div>
+                </div>
+                <div class="kpi-card kpi-gold">
+                    <div class="kpi-icon">👑</div>
+                    <div class="kpi-info">
+                        <div class="kpi-value" id="kpiPremium">—</div>
+                        <div class="kpi-label">Premium</div>
+                    </div>
+                    <div class="kpi-glow"></div>
+                </div>
+                <div class="kpi-card kpi-green">
+                    <div class="kpi-icon">📋</div>
+                    <div class="kpi-info">
+                        <div class="kpi-value" id="kpiTxns">—</div>
+                        <div class="kpi-label">Tranzaksiyalar</div>
+                    </div>
+                    <div class="kpi-glow"></div>
+                </div>
+                <div class="kpi-card kpi-purple">
+                    <div class="kpi-icon">🎟️</div>
+                    <div class="kpi-info">
+                        <div class="kpi-value" id="kpiCoupons">—</div>
+                        <div class="kpi-label">Faol Kuponlar</div>
+                    </div>
+                    <div class="kpi-glow"></div>
+                </div>
+            </div>
+
+            <!-- Recent Users -->
+            <div class="section-card">
+                <div class="section-head">
+                    <h3>🕐 So'nggi Foydalanuvchilar</h3>
+                    <button class="see-all-btn" onclick="goToPage('users')">Barchasini ko'rish →</button>
+                </div>
+                <div id="recentUsersList" class="recent-list">
+                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row"></div>
+                </div>
             </div>
         </div>
 
-        <!-- Coupons Tab -->
-        <div class="admin-tab-content" id="tab-coupons">
-            <div class="section-header">
-                <h3>🎟️ Kupon kodlar</h3>
+        <!-- PAGE: USERS -->
+        <div class="page" id="page-users">
+            <div class="section-card">
+                <div class="section-head">
+                    <h3>👥 Foydalanuvchilar</h3>
+                    <div class="head-actions">
+                        <div class="filter-pills" id="userFilterPills">
+                            <button class="pill active" data-filter="all">Hammasi</button>
+                            <button class="pill" data-filter="premium">👑 Premium</button>
+                            <button class="pill" data-filter="free">Bepul</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="search-wrap">
+                    <span class="search-ico">🔍</span>
+                    <input type="text" id="userSearch" class="search-field"
+                        placeholder="Ism, username yoki ID bo'yicha qidirish..." />
+                </div>
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Foydalanuvchi</th>
+                                <th>Holat</th>
+                                <th>Xabarlar</th>
+                                <th>Ro'yxatdan</th>
+                                <th>Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersBody">
+                            <tr>
+                                <td colspan="6" class="empty-cell">Yuklanmoqda...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
+        </div>
 
-            <!-- Create Coupon Form -->
-            <div class="coupon-form glass-card">
-                <h4>➕ Yangi kupon yaratish</h4>
-                <div class="form-row">
+        <!-- PAGE: COUPONS -->
+        <div class="page" id="page-coupons">
+            <!-- Create Form -->
+            <div class="section-card">
+                <div class="section-head">
+                    <h3>➕ Yangi Kupon Yaratish</h3>
+                </div>
+                <div class="form-grid">
                     <div class="form-group">
-                        <label>Kupon kodi</label>
-                        <div class="code-input-wrap">
-                            <input type="text" id="couponCode" placeholder="Masalan: HISOBLA50" />
-                            <button class="gen-btn" onclick="generateRandomCode()">🎲</button>
+                        <label>Kupon Kodi</label>
+                        <div class="code-row">
+                            <input type="text" id="couponCode" placeholder="HISOBLA50" class="form-input code-input" />
+                            <button class="dice-btn" onclick="generateCode()" title="Tasodifiy kod">🎲</button>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Tarif turi</label>
-                        <select id="couponPlan">
-                            <option value="1_month">1 Oylik (15,000)</option>
-                            <option value="3_months">3 Oylik (40,000)</option>
-                            <option value="6_months">6 Oylik (70,000)</option>
-                            <option value="1_year">1 Yillik (130,000)</option>
-                            <option value="lifetime">Umrbod (300,000)</option>
+                        <label>Tarif Turi</label>
+                        <select id="couponPlan" class="form-input">
+                            <option value="1_month">1 Oylik — 15,000 so'm</option>
+                            <option value="3_months">3 Oylik — 40,000 so'm</option>
+                            <option value="6_months">6 Oylik — 70,000 so'm</option>
+                            <option value="1_year">1 Yillik — 130,000 so'm</option>
+                            <option value="lifetime">Umrbod — 300,000 so'm</option>
                         </select>
                     </div>
-                </div>
-                <div class="form-row">
                     <div class="form-group">
-                        <label>Ishlatish limiti</label>
-                        <input type="number" id="couponLimit" value="1" min="1" max="10000" />
+                        <label>Ishlatish Limiti</label>
+                        <input type="number" id="couponLimit" class="form-input" value="1" min="1" max="9999" />
                     </div>
                     <div class="form-group">
-                        <label>Amal qilish sanasi</label>
-                        <input type="date" id="couponExpiry" />
+                        <label>Amal Qilish Sanasi</label>
+                        <input type="date" id="couponExpiry" class="form-input" />
                     </div>
                 </div>
-                <button class="create-coupon-btn" onclick="createCoupon()">🎟️ Kupon yaratish</button>
+                <button class="primary-btn full-btn" onclick="createCoupon()">🎟️ Kupon Yaratish</button>
             </div>
 
             <!-- Coupons List -->
-            <div class="table-wrap">
-                <table class="admin-table" id="couponsTable">
-                    <thead>
-                        <tr>
-                            <th>Kod</th>
-                            <th>Tarif</th>
-                            <th>Ishlatilgan</th>
-                            <th>Limit</th>
-                            <th>Muddat</th>
-                            <th>Holat</th>
-                            <th>Boshqarish</th>
-                        </tr>
-                    </thead>
-                    <tbody id="couponsTableBody">
-                        <tr>
-                            <td colspan="7" class="loading-cell">Yuklanmoqda...</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="section-card">
+                <div class="section-head">
+                    <h3>📋 Barcha Kuponlar</h3>
+                </div>
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Kod</th>
+                                <th>Tarif</th>
+                                <th>Foydalanish</th>
+                                <th>Muddat</th>
+                                <th>Holat</th>
+                                <th>Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="couponsBody">
+                            <tr>
+                                <td colspan="6" class="empty-cell">Yuklanmoqda...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-    </main>
+        <!-- PAGE: BROADCAST -->
+        <div class="page" id="page-broadcast">
+            <div class="section-card">
+                <div class="section-head">
+                    <h3>📣 Xabar Yuborish</h3>
+                </div>
+                <div class="broadcast-info">
+                    <div class="binfo-card">
+                        <div class="binfo-icon">👥</div>
+                        <div class="binfo-val" id="bcTotal">—</div>
+                        <div class="binfo-label">Jami Userlar</div>
+                    </div>
+                    <div class="binfo-card">
+                        <div class="binfo-icon">👑</div>
+                        <div class="binfo-val" id="bcPremium">—</div>
+                        <div class="binfo-label">Premium</div>
+                    </div>
+                    <div class="binfo-card">
+                        <div class="binfo-icon">🆓</div>
+                        <div class="binfo-val" id="bcFree">—</div>
+                        <div class="binfo-label">Bepul</div>
+                    </div>
+                </div>
 
-    <!-- Toast -->
+                <div class="form-group">
+                    <label>Kimga yuborish?</label>
+                    <div class="target-pills">
+                        <label class="target-pill">
+                            <input type="radio" name="bcTarget" value="all" checked />
+                            <span>👥 Barcha userlar</span>
+                        </label>
+                        <label class="target-pill">
+                            <input type="radio" name="bcTarget" value="premium" />
+                            <span>👑 Faqat Premium</span>
+                        </label>
+                        <label class="target-pill">
+                            <input type="radio" name="bcTarget" value="free" />
+                            <span>🆓 Faqat Bepul</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Xabar Matni (HTML qo'llab-quvvatlanadi: &lt;b&gt;, &lt;i&gt;, &lt;a&gt;)</label>
+                    <textarea id="bcMessage" class="broadcast-textarea"
+                        placeholder="Assalomu Alaykum! 👋&#10;&#10;Sizga yangilik borligini xabar qilamiz..."></textarea>
+                </div>
+
+                <div class="broadcast-actions">
+                    <div class="char-count" id="charCount">0 belgi</div>
+                    <button class="primary-btn broadcast-send-btn" onclick="sendBroadcast()">
+                        📣 Xabar Yuborish
+                    </button>
+                </div>
+
+                <div class="broadcast-result hidden" id="broadcastResult"></div>
+            </div>
+        </div>
+
+    </div><!-- /main-wrap -->
+
+    <!-- USER MODAL -->
+    <div class="modal-overlay hidden" id="userModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalTitle">Foydalanuvchi Ma'lumotlari</h3>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer" id="modalFooter"></div>
+        </div>
+    </div>
+
+    <!-- TOAST -->
     <div class="toast" id="toast"></div>
 
     <script src="admin.js"></script>

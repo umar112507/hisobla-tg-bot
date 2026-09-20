@@ -37,7 +37,7 @@ function checkAdmin(req: Request, url: URL): boolean {
 
 function checkAdminPost(body: any): boolean {
     if (!body) return false;
-    const userId = body.user_id || body.admin_id;
+    const userId = body.admin_id || body.user_id;
     const secret = body.secret;
 
     if (ALLOWED_ADMIN_IDS.length > 0) {
@@ -248,11 +248,19 @@ Deno.serve(async (req) => {
         return jsonRes(data || []);
     }
 
+    // GET /api/admin/transactions
+    if (req.method === "GET" && url.pathname.endsWith("/api/admin/transactions")) {
+        if (!checkAdmin(req, url)) return jsonRes({ error: "Unauthorized" }, 401);
+
+        const { data } = await supabase.from("transactions").select("*").order("created_at", { ascending: false }).limit(50);
+        return jsonRes(data || []);
+    }
+
     // POST /api/admin/toggle-premium
     if (req.method === "POST" && url.pathname.endsWith("/api/admin/toggle-premium")) {
         try {
             const body = await req.json();
-            if (body.secret !== ADMIN_SECRET) return jsonRes({ error: "Unauthorized" }, 401);
+            if (!checkAdminPost(body)) return jsonRes({ error: "Unauthorized" }, 401);
 
             await supabase.from("users").update({ is_premium: body.is_premium }).eq("user_id", body.user_id);
             return jsonRes({ success: true });
@@ -265,7 +273,7 @@ Deno.serve(async (req) => {
     if (req.method === "POST" && url.pathname.endsWith("/api/admin/reset-usage")) {
         try {
             const body = await req.json();
-            if (body.secret !== ADMIN_SECRET) return jsonRes({ error: "Unauthorized" }, 401);
+            if (!checkAdminPost(body)) return jsonRes({ error: "Unauthorized" }, 401);
 
             await supabase.from("users").update({
                 usage_count: 0,
@@ -289,7 +297,7 @@ Deno.serve(async (req) => {
     if (req.method === "POST" && url.pathname.endsWith("/api/admin/coupons/create")) {
         try {
             const body = await req.json();
-            if (body.secret !== ADMIN_SECRET) return jsonRes({ error: "Unauthorized" }, 401);
+            if (!checkAdminPost(body)) return jsonRes({ error: "Unauthorized" }, 401);
 
             // Check if code already exists
             const { data: existing } = await supabase.from("coupons").select("id").eq("code", body.code).single();
@@ -314,7 +322,7 @@ Deno.serve(async (req) => {
     if (req.method === "POST" && url.pathname.endsWith("/api/admin/coupons/toggle")) {
         try {
             const body = await req.json();
-            if (body.secret !== ADMIN_SECRET) return jsonRes({ error: "Unauthorized" }, 401);
+            if (!checkAdminPost(body)) return jsonRes({ error: "Unauthorized" }, 401);
 
             await supabase.from("coupons").update({ is_active: body.is_active }).eq("id", body.coupon_id);
             return jsonRes({ success: true });
@@ -327,12 +335,52 @@ Deno.serve(async (req) => {
     if (req.method === "POST" && url.pathname.endsWith("/api/admin/coupons/delete")) {
         try {
             const body = await req.json();
-            if (body.secret !== ADMIN_SECRET) return jsonRes({ error: "Unauthorized" }, 401);
+            if (!checkAdminPost(body)) return jsonRes({ error: "Unauthorized" }, 401);
 
             await supabase.from("coupons").delete().eq("id", body.coupon_id);
             return jsonRes({ success: true });
         } catch (e) {
             return jsonRes({ error: "Failed" }, 400);
+        }
+    }
+
+    // POST /api/admin/broadcast
+    if (req.method === "POST" && url.pathname.endsWith("/api/admin/broadcast")) {
+        try {
+            const body = await req.json();
+            if (!checkAdminPost(body)) return jsonRes({ error: "Unauthorized" }, 401);
+
+            const { target, message } = body;
+            if (!message) return jsonRes({ error: "Message is required" }, 400);
+
+            let query = supabase.from("users").select("user_id");
+            if (target === "premium") query = query.eq("is_premium", true);
+            else if (target === "free") query = query.eq("is_premium", false);
+
+            const { data: users, error } = await query;
+            if (error || !users) return jsonRes({ error: "Foydalanuvchilarni olishda xatolik" }, 400);
+
+            let sent = 0;
+            // Send asynchronously to avoid function timeout
+            for (const u of users) {
+                if (u.user_id) {
+                    try {
+                        await bot.api.sendMessage(u.user_id, message, { parse_mode: "HTML" });
+                        sent++;
+                    } catch (err: any) {
+                        const status = err.error_code || err.response?.status;
+                        // User blocked bot or deleted account, logic handles graceful failure
+                        if (status === 403) {
+                            // Optionally flag user as inactive in DB
+                        }
+                    }
+                }
+            }
+
+            return jsonRes({ success: true, sent, total_attempted: users.length });
+        } catch (e: any) {
+            console.error("Broadcast Error:", e);
+            return jsonRes({ error: "Failed to broadcast" }, 400);
         }
     }
 

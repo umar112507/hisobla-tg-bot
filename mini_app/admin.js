@@ -1,291 +1,424 @@
-// ─── Config ───────────────────────────────────────────────────
+// ─── Config ───────────────────────────────────────────────
 const API_BASE = "https://dyqmawwyooeqadibnpqc.supabase.co/functions/v1/telegram-bot";
 const tg = window.Telegram?.WebApp;
-
-// Check URL params or Telegram WebApp user object
 const params = new URLSearchParams(window.location.search);
-const TG_USER_ID = tg?.initDataUnsafe?.user?.id || params.get("user_id") || params.get("id") || "";
-const ADMIN_SECRET = params.get("secret") || "hisobla_admin_2024";
 
+let TG_USER_ID = "";
+let TG_USER = null;
+let ADMIN_SECRET = params.get("secret") || "hisobla_admin_2024";
+
+// Get Telegram user ID from WebApp or URL param
+if (tg?.initDataUnsafe?.user) {
+    TG_USER = tg.initDataUnsafe.user;
+    TG_USER_ID = String(TG_USER.id);
+} else {
+    TG_USER_ID = params.get("user_id") || params.get("id") || "";
+}
+
+// ─── State ────────────────────────────────────────────────
 let allUsers = [];
 let allCoupons = [];
+let currentPage = "dashboard";
+let userFilter = "all";
 
+// ─── Init ─────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
-    setupTabs();
-    await verifyAdminAndLoad();
+    if (tg) { tg.expand(); try { tg.setHeaderColor("#080c14"); tg.setBackgroundColor("#080c14"); } catch (e) { } }
 
-    document.getElementById("userSearch")?.addEventListener("input", (e) => {
-        filterUsers(e.target.value);
-    });
+    await verifyAndBoot();
+    setupNav();
+    setupUserSearch();
+    setupUserFilter();
+    setupBroadcastCharCount();
 
-    // Set default expiry to 30 days from now
-    const expDate = new Date();
-    expDate.setDate(expDate.getDate() + 30);
+    // Set default coupon expiry (30 days from now)
+    const exp = new Date(); exp.setDate(exp.getDate() + 30);
     const expiryEl = document.getElementById("couponExpiry");
-    if (expiryEl) expiryEl.value = expDate.toISOString().split("T")[0];
+    if (expiryEl) expiryEl.value = exp.toISOString().split("T")[0];
 });
 
-async function verifyAdminAndLoad() {
+// ─── Auth & Boot ──────────────────────────────────────────
+async function verifyAndBoot() {
     try {
-        let url = `${API_BASE}/api/admin/stats?user_id=${TG_USER_ID}&secret=${encodeURIComponent(ADMIN_SECRET)}`;
+        const url = buildAdminUrl("/api/admin/stats");
         const res = await fetch(url);
 
         if (!res.ok) {
-            showAccessDenied();
+            showDenied();
             return;
         }
-
         const data = await res.json();
-        document.getElementById("statUsers").textContent = data.total_users || 0;
-        document.getElementById("statPremium").textContent = data.premium_users || 0;
-        document.getElementById("statTransactions").textContent = data.total_transactions || 0;
-        document.getElementById("statCoupons").textContent = data.active_coupons || 0;
-
-        hideAccessDenied();
+        hideLoading();
+        setAdminChip();
+        updateKPI(data);
+        loadDashboard();
         loadUsers();
         loadCoupons();
     } catch (e) {
-        console.error("Admin verify failed:", e);
-        showAccessDenied();
+        console.error("Auth error:", e);
+        showDenied();
     }
 }
 
-function showAccessDenied() {
-    const overlay = document.getElementById("accessDeniedOverlay");
-    const text = document.getElementById("accessDeniedText");
-    if (overlay) overlay.classList.remove("hidden");
+function buildAdminUrl(path) {
+    let url = `${API_BASE}${path}?user_id=${TG_USER_ID}&secret=${encodeURIComponent(ADMIN_SECRET)}`;
+    return url;
+}
+
+function showDenied() {
+    document.getElementById("loadingScreen").classList.add("hidden");
+    const overlay = document.getElementById("deniedOverlay");
+    const text = document.getElementById("deniedText");
+    overlay.classList.remove("hidden");
     if (text) {
         text.textContent = TG_USER_ID
-            ? `🚫 Sizning Telegram ID (#${TG_USER_ID}) Adminlar ro'yxatida topilmadi.`
-            : "🚫 Kirish taqiqlangan. Ushbu sahifani Telegram bot orqali oching.";
+            ? `Sizning Telegram ID (#${TG_USER_ID}) adminlar ro'yxatida topilmadi.`
+            : "Ushbu sahifani Telegram bot orqali oching.";
     }
 }
 
-function hideAccessDenied() {
-    document.getElementById("accessDeniedOverlay")?.classList.add("hidden");
+function hideLoading() {
+    document.getElementById("loadingScreen").classList.add("hidden");
 }
 
-// ─── Tabs ─────────────────────────────────────────────────────
-function setupTabs() {
-    document.querySelectorAll(".admin-tab-btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-            document.querySelectorAll(".admin-tab-btn").forEach(b => b.classList.remove("active"));
-            document.querySelectorAll(".admin-tab-content").forEach(c => c.classList.remove("active"));
-            btn.classList.add("active");
-            document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+function setAdminChip() {
+    const el = document.getElementById("adminChipName");
+    if (!el) return;
+    if (TG_USER) {
+        el.textContent = TG_USER.first_name || "Admin";
+    } else if (TG_USER_ID) {
+        el.textContent = `Admin #${TG_USER_ID}`;
+    }
+}
+
+// ─── Navigation ───────────────────────────────────────────
+const PAGE_TITLES = {
+    dashboard: "Dashboard",
+    users: "Foydalanuvchilar",
+    coupons: "Kuponlar",
+    broadcast: "Broadcast"
+};
+
+function setupNav() {
+    document.querySelectorAll(".nav-item").forEach(item => {
+        item.addEventListener("click", (e) => {
+            e.preventDefault();
+            goToPage(item.dataset.page);
+            // Close sidebar on mobile
+            if (window.innerWidth <= 768) {
+                document.getElementById("sidebar").classList.remove("open");
+            }
         });
     });
 }
 
-// ─── Load Dashboard Stats ─────────────────────────────────────
-async function loadStats() {
-    if (!ADMIN_SECRET) return;
-    try {
-        let url = `${API_BASE}/api/admin/stats?secret=${encodeURIComponent(ADMIN_SECRET)}`;
-        if (TG_USER_ID) url += `&user_id=${TG_USER_ID}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        document.getElementById("statUsers").textContent = data.total_users || 0;
-        document.getElementById("statPremium").textContent = data.premium_users || 0;
-        document.getElementById("statTransactions").textContent = data.total_transactions || 0;
-        document.getElementById("statCoupons").textContent = data.active_coupons || 0;
-    } catch (e) {
-        console.error("Stats load error:", e);
+function goToPage(page) {
+    currentPage = page;
+    document.querySelectorAll(".nav-item").forEach(i => i.classList.toggle("active", i.dataset.page === page));
+    document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.id === `page-${page}`));
+    document.getElementById("pageTitle").textContent = PAGE_TITLES[page] || page;
+}
+
+function toggleSidebar() {
+    document.getElementById("sidebar").classList.toggle("open");
+}
+
+function refreshPage() {
+    verifyAndBoot();
+    toast("🔄 Yangilanmoqda...");
+}
+
+// ─── KPI Update ───────────────────────────────────────────
+function updateKPI(data) {
+    animateNum("kpiUsers", data.total_users || 0);
+    animateNum("kpiPremium", data.premium_users || 0);
+    animateNum("kpiTxns", data.total_transactions || 0);
+    animateNum("kpiCoupons", data.active_coupons || 0);
+
+    // Broadcast info cards
+    const free = (data.total_users || 0) - (data.premium_users || 0);
+    setEl("bcTotal", data.total_users || 0);
+    setEl("bcPremium", data.premium_users || 0);
+    setEl("bcFree", free > 0 ? free : 0);
+
+    // Nav badge
+    setEl("navBadgeUsers", data.total_users || 0);
+}
+
+function animateNum(id, target) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    let current = 0;
+    const step = Math.max(1, Math.ceil(target / 30));
+    const timer = setInterval(() => {
+        current = Math.min(current + step, target);
+        el.textContent = current.toLocaleString();
+        if (current >= target) clearInterval(timer);
+    }, 30);
+}
+
+function setEl(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+}
+
+// ─── Dashboard: Recent Users ──────────────────────────────
+async function loadDashboard() {
+    // Recent users (already in allUsers, or load fresh)
+    if (allUsers.length > 0) {
+        renderRecentUsers(allUsers.slice(0, 5));
+    } else {
+        try {
+            const res = await fetch(buildAdminUrl("/api/admin/users"));
+            if (res.ok) {
+                allUsers = await res.json();
+                renderRecentUsers(allUsers.slice(0, 5));
+            }
+        } catch (e) { console.error(e); }
     }
 }
 
-// ─── Load Users ───────────────────────────────────────────────
+function renderRecentUsers(users) {
+    const el = document.getElementById("recentUsersList");
+    if (!el) return;
+    if (!users.length) { el.innerHTML = `<div class="empty-cell">Foydalanuvchilar yo'q</div>`; return; }
+
+    el.innerHTML = users.map(u => {
+        const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || "Noma'lum";
+        const initials = name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+        const color = avatarColor(u.user_id);
+        const badge = u.is_premium
+            ? `<span class="badge badge-premium">👑 Premium</span>`
+            : `<span class="badge badge-free">Bepul</span>`;
+        const date = u.created_at ? new Date(u.created_at).toLocaleDateString("uz-UZ") : "—";
+        return `
+        <div class="recent-row">
+          <div class="recent-avatar" style="background:${color}20;color:${color}">${initials}</div>
+          <div>
+            <div class="recent-name">${escHtml(name)}</div>
+            <div class="recent-meta">${u.username ? "@" + escHtml(u.username) : "#" + u.user_id} · ${date}</div>
+          </div>
+          <div class="recent-status">${badge}</div>
+        </div>`;
+    }).join("");
+}
+
+// ─── Users ────────────────────────────────────────────────
 async function loadUsers() {
     try {
-        let url = `${API_BASE}/api/admin/users?user_id=${TG_USER_ID}&secret=${encodeURIComponent(ADMIN_SECRET)}`;
-        const res = await fetch(url);
+        const res = await fetch(buildAdminUrl("/api/admin/users"));
         if (!res.ok) return;
         allUsers = await res.json();
-        renderUsers(allUsers);
+        renderUsers(filterUsersData(allUsers));
+        renderRecentUsers(allUsers.slice(0, 5));
     } catch (e) {
-        console.error("Users load error:", e);
-        document.getElementById("usersTableBody").innerHTML = `<tr><td colspan="7" class="loading-cell">❌ Xatolik</td></tr>`;
+        document.getElementById("usersBody").innerHTML = `<tr><td colspan="6" class="empty-cell">❌ Xatolik yuz berdi</td></tr>`;
     }
 }
 
-function filterUsers(query) {
+function setupUserSearch() {
+    document.getElementById("userSearch")?.addEventListener("input", e => {
+        renderUsers(filterUsersData(allUsers, e.target.value));
+    });
+}
+
+function setupUserFilter() {
+    document.querySelectorAll("#userFilterPills .pill").forEach(pill => {
+        pill.addEventListener("click", () => {
+            document.querySelectorAll("#userFilterPills .pill").forEach(p => p.classList.remove("active"));
+            pill.classList.add("active");
+            userFilter = pill.dataset.filter;
+            renderUsers(filterUsersData(allUsers, document.getElementById("userSearch")?.value || ""));
+        });
+    });
+}
+
+function filterUsersData(users, query = "") {
     const q = query.toLowerCase();
-    const filtered = allUsers.filter(u =>
-        String(u.user_id).includes(q) ||
-        (u.first_name || "").toLowerCase().includes(q) ||
-        (u.last_name || "").toLowerCase().includes(q) ||
-        (u.username || "").toLowerCase().includes(q)
-    );
-    renderUsers(filtered);
+    return users.filter(u => {
+        const matchFilter =
+            userFilter === "all" ||
+            (userFilter === "premium" && u.is_premium) ||
+            (userFilter === "free" && !u.is_premium);
+        const matchSearch = !q ||
+            String(u.user_id).includes(q) ||
+            (u.first_name || "").toLowerCase().includes(q) ||
+            (u.last_name || "").toLowerCase().includes(q) ||
+            (u.username || "").toLowerCase().includes(q);
+        return matchFilter && matchSearch;
+    });
 }
 
 function renderUsers(users) {
-    const tbody = document.getElementById("usersTableBody");
+    const tbody = document.getElementById("usersBody");
     if (!users.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="loading-cell">Foydalanuvchilar topilmadi</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-cell">Foydalanuvchilar topilmadi</td></tr>`;
         return;
     }
     tbody.innerHTML = users.map(u => {
-        const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || "—";
-        const statusBadge = u.is_premium
-            ? `<span class="badge premium">👑 Premium</span>`
-            : `<span class="badge free">Bepul</span>`;
+        const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || "Noma'lum";
+        const initials = name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+        const color = avatarColor(u.user_id);
+        const badge = u.is_premium
+            ? `<span class="badge badge-premium">👑 Premium</span>`
+            : `<span class="badge badge-free">Bepul</span>`;
         const usage = `${u.usage_count || 0}/10`;
         const date = u.created_at ? new Date(u.created_at).toLocaleDateString("uz-UZ") : "—";
         const toggleBtn = u.is_premium
-            ? `<button class="action-btn danger-btn" onclick="togglePremium(${u.user_id}, false)">🚫 Bekor</button>`
-            : `<button class="action-btn premium-btn" onclick="togglePremium(${u.user_id}, true)">👑 Premium</button>`;
-
+            ? `<button class="act-btn red" onclick="togglePremium(${u.user_id}, false)">🚫 Bekor</button>`
+            : `<button class="act-btn gold" onclick="togglePremium(${u.user_id}, true)">👑 Premium</button>`;
         return `<tr>
-            <td>${u.user_id}</td>
-            <td>${escHtml(name)}</td>
-            <td>${u.username ? `@${escHtml(u.username)}` : "—"}</td>
-            <td>${statusBadge}</td>
-            <td>${usage}</td>
-            <td>${date}</td>
-            <td>${toggleBtn}<button class="action-btn" onclick="resetUsage(${u.user_id})">🔄</button></td>
+          <td><code style="color:var(--text-muted);font-size:11px">${u.user_id}</code></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:30px;height:30px;border-radius:50%;background:${color}20;color:${color};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex-shrink:0">${initials}</div>
+              <div>
+                <div style="font-weight:600;font-size:13px">${escHtml(name)}</div>
+                <div style="font-size:11px;color:var(--text-muted)">${u.username ? "@" + escHtml(u.username) : ""}</div>
+              </div>
+            </div>
+          </td>
+          <td>${badge}</td>
+          <td><span style="font-size:12px;color:var(--text-sec)">${usage}</span></td>
+          <td><span style="font-size:12px;color:var(--text-muted)">${date}</span></td>
+          <td>
+            ${toggleBtn}
+            <button class="act-btn green" onclick="resetUsage(${u.user_id})" title="Limitni sifirla">🔄</button>
+            <button class="act-btn info"  onclick="openUserModal(${u.user_id})" title="Batafsil">🔍</button>
+          </td>
         </tr>`;
     }).join("");
 }
 
-// ─── Toggle Premium ───────────────────────────────────────────
+// ─── Toggle Premium ───────────────────────────────────────
 async function togglePremium(userId, enable) {
-    const action = enable ? "Premium berish" : "Premiumni bekor qilish";
-    if (!confirm(`${action}: User #${userId}?`)) return;
-
+    const action = enable ? "Premium bermoqchimisiz?" : "Premiumni bekor qilmoqchimisiz?";
+    if (!confirm(`User #${userId}: ${action}`)) return;
     try {
         const res = await fetch(`${API_BASE}/api/admin/toggle-premium`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ secret: ADMIN_SECRET, user_id: userId, is_premium: enable }),
+            body: JSON.stringify({ secret: ADMIN_SECRET, user_id: userId, is_premium: enable, admin_id: TG_USER_ID }),
         });
         if (res.ok) {
-            showToast(enable ? "👑 Premium berildi!" : "🚫 Premium bekor qilindi");
-            loadUsers();
-            loadStats();
-        } else {
-            showToast("❌ Xatolik yuz berdi");
-        }
-    } catch (e) {
-        showToast("❌ Xatolik yuz berdi");
-    }
+            toast(enable ? "👑 Premium berildi!" : "🚫 Premium bekor qilindi");
+            await loadUsers();
+            await refreshStats();
+        } else { toast("❌ Xatolik yuz berdi"); }
+    } catch (e) { toast("❌ Server bilan bog'lanib bo'lmadi"); }
 }
 
-// ─── Reset Usage Counter ──────────────────────────────────────
+// ─── Reset Usage ──────────────────────────────────────────
 async function resetUsage(userId) {
-    if (!confirm(`User #${userId} xabar limitini yangilashni xohlaysizmi?`)) return;
-
+    if (!confirm(`User #${userId}: xabar limitini sifirlamoqchimisiz?`)) return;
     try {
         const res = await fetch(`${API_BASE}/api/admin/reset-usage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ secret: ADMIN_SECRET, user_id: userId }),
+            body: JSON.stringify({ secret: ADMIN_SECRET, user_id: userId, admin_id: TG_USER_ID }),
         });
-        if (res.ok) {
-            showToast("🔄 Xabar limiti yangilandi!");
-            loadUsers();
-        } else {
-            showToast("❌ Xatolik yuz berdi");
-        }
-    } catch (e) {
-        showToast("❌ Xatolik yuz berdi");
-    }
+        if (res.ok) { toast("🔄 Limit sifirlanadi!"); await loadUsers(); }
+        else { toast("❌ Xatolik yuz berdi"); }
+    } catch (e) { toast("❌ Server bilan bog'lanib bo'lmadi"); }
 }
 
-// ─── Load Coupons ─────────────────────────────────────────────
+// ─── User Modal ───────────────────────────────────────────
+function openUserModal(userId) {
+    const u = allUsers.find(x => x.user_id === userId);
+    if (!u) return;
+    const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || "Noma'lum";
+    const initials = name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+    const color = avatarColor(u.user_id);
+    const date = u.created_at ? new Date(u.created_at).toLocaleString("uz-UZ") : "—";
+
+    document.getElementById("modalTitle").textContent = escHtml(name);
+    document.getElementById("modalBody").innerHTML = `
+      <div class="modal-avatar" style="background:${color}20;color:${color}">${initials}</div>
+      <div class="modal-row"><span class="modal-row-label">Telegram ID</span><span class="modal-row-value">${u.user_id}</span></div>
+      <div class="modal-row"><span class="modal-row-label">Ism</span><span class="modal-row-value">${escHtml(name)}</span></div>
+      <div class="modal-row"><span class="modal-row-label">Username</span><span class="modal-row-value">${u.username ? "@" + escHtml(u.username) : "—"}</span></div>
+      <div class="modal-row"><span class="modal-row-label">Holat</span><span class="modal-row-value">${u.is_premium ? "👑 Premium" : "🆓 Bepul"}</span></div>
+      <div class="modal-row"><span class="modal-row-label">Xabarlar ishlatilgan</span><span class="modal-row-value">${u.usage_count || 0} / 10</span></div>
+      <div class="modal-row"><span class="modal-row-label">Ro'yxatdan o'tgan</span><span class="modal-row-value">${date}</span></div>
+    `;
+    document.getElementById("modalFooter").innerHTML = u.is_premium
+        ? `<button class="act-btn red" onclick="togglePremium(${u.user_id}, false);closeModal()">🚫 Premiumni bekor qilish</button>`
+        : `<button class="act-btn gold" onclick="togglePremium(${u.user_id}, true);closeModal()">👑 Premium berish</button>`;
+    document.getElementById("userModal").classList.remove("hidden");
+}
+
+function closeModal() {
+    document.getElementById("userModal").classList.add("hidden");
+}
+
+// ─── Coupons ──────────────────────────────────────────────
 async function loadCoupons() {
     try {
-        let url = `${API_BASE}/api/admin/coupons?user_id=${TG_USER_ID}&secret=${encodeURIComponent(ADMIN_SECRET)}`;
-        const res = await fetch(url);
+        const res = await fetch(buildAdminUrl("/api/admin/coupons"));
         if (!res.ok) return;
         allCoupons = await res.json();
         renderCoupons(allCoupons);
-    } catch (e) {
-        console.error("Coupons load error:", e);
-    }
+    } catch (e) { console.error(e); }
 }
 
+const PLAN_NAMES = { "1_month": "1 Oy", "3_months": "3 Oy", "6_months": "6 Oy", "1_year": "1 Yil", "lifetime": "Umrbod" };
+
 function renderCoupons(coupons) {
-    const tbody = document.getElementById("couponsTableBody");
+    const tbody = document.getElementById("couponsBody");
     if (!coupons.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="loading-cell">Kuponlar yo'q. Yuqorida yarating!</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-cell">Kuponlar topilmadi. Yuqorida yarating!</td></tr>`;
         return;
     }
-
-    const planNames = {
-        "1_month": "1 Oy",
-        "3_months": "3 Oy",
-        "6_months": "6 Oy",
-        "1_year": "1 Yil",
-        "lifetime": "Umrbod",
-    };
-
     tbody.innerHTML = coupons.map(c => {
         const now = new Date();
         const expiry = c.expires_at ? new Date(c.expires_at) : null;
         const isExpired = expiry && expiry < now;
         const isFull = c.used_count >= c.max_uses;
-        const isActive = c.is_active && !isExpired && !isFull;
 
-        let statusBadge;
-        if (!c.is_active) statusBadge = `<span class="badge inactive-badge">O'chirilgan</span>`;
-        else if (isExpired) statusBadge = `<span class="badge expired">Muddati tugagan</span>`;
-        else if (isFull) statusBadge = `<span class="badge expired">Limiti tugagan</span>`;
-        else statusBadge = `<span class="badge active-badge">Faol</span>`;
-
-        const expiryText = expiry ? expiry.toLocaleDateString("uz-UZ") : "—";
-        const plan = planNames[c.plan] || c.plan;
+        let badge;
+        if (!c.is_active) badge = `<span class="badge badge-inactive">O'chirilgan</span>`;
+        else if (isExpired) badge = `<span class="badge badge-expired">Muddati tugagan</span>`;
+        else if (isFull) badge = `<span class="badge badge-expired">Limit tugagan</span>`;
+        else badge = `<span class="badge badge-active">Faol</span>`;
 
         const toggleBtn = c.is_active
-            ? `<button class="action-btn danger-btn" onclick="toggleCoupon('${c.id}', false)">🚫</button>`
-            : `<button class="action-btn" onclick="toggleCoupon('${c.id}', true)">✅</button>`;
+            ? `<button class="act-btn red" onclick="toggleCoupon('${c.id}', false)">🚫</button>`
+            : `<button class="act-btn green" onclick="toggleCoupon('${c.id}', true)">✅</button>`;
 
         return `<tr>
-            <td><code style="background:rgba(255,152,0,0.15);padding:2px 8px;border-radius:6px;color:#ffb300;font-weight:700;letter-spacing:1px;">${escHtml(c.code)}</code></td>
-            <td>${plan}</td>
-            <td>${c.used_count}</td>
-            <td>${c.max_uses}</td>
-            <td>${expiryText}</td>
-            <td>${statusBadge}</td>
-            <td>${toggleBtn}<button class="action-btn danger-btn" onclick="deleteCoupon('${c.id}')">🗑️</button></td>
+          <td><span class="coupon-code">${escHtml(c.code)}</span></td>
+          <td style="font-size:12px">${PLAN_NAMES[c.plan] || c.plan}</td>
+          <td style="font-size:12px">${c.used_count} / ${c.max_uses}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${expiry ? expiry.toLocaleDateString("uz-UZ") : "—"}</td>
+          <td>${badge}</td>
+          <td>${toggleBtn}<button class="act-btn red" onclick="deleteCoupon('${c.id}')">🗑️</button></td>
         </tr>`;
     }).join("");
 }
 
-// ─── Create Coupon ────────────────────────────────────────────
 async function createCoupon() {
     const code = document.getElementById("couponCode").value.trim().toUpperCase();
     const plan = document.getElementById("couponPlan").value;
     const maxUses = parseInt(document.getElementById("couponLimit").value) || 1;
-    const expiresAt = document.getElementById("couponExpiry").value || null;
-
-    if (!code) {
-        showToast("❌ Kupon kodini kiriting!");
-        return;
-    }
-
+    const expiry = document.getElementById("couponExpiry").value || null;
+    if (!code) { toast("❌ Kupon kodini kiriting!"); return; }
     try {
         const res = await fetch(`${API_BASE}/api/admin/coupons/create`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ secret: ADMIN_SECRET, code, plan, max_uses: maxUses, expires_at: expiresAt }),
+            body: JSON.stringify({ secret: ADMIN_SECRET, code, plan, max_uses: maxUses, expires_at: expiry }),
         });
-
         if (res.ok) {
-            showToast(`🎟️ Kupon "${code}" yaratildi!`);
+            toast(`🎟️ "${code}" yaratildi!`);
             document.getElementById("couponCode").value = "";
-            loadCoupons();
-            loadStats();
+            await loadCoupons(); await refreshStats();
         } else {
             const err = await res.json();
-            showToast(`❌ ${err.error || "Xatolik yuz berdi"}`);
+            toast(`❌ ${err.error || "Xatolik yuz berdi"}`);
         }
-    } catch (e) {
-        showToast("❌ Xatolik yuz berdi");
-    }
+    } catch (e) { toast("❌ Server bilan bog'lanib bo'lmadi"); }
 }
 
-// ─── Toggle / Delete Coupon ───────────────────────────────────
 async function toggleCoupon(id, enable) {
     try {
         const res = await fetch(`${API_BASE}/api/admin/coupons/toggle`, {
@@ -293,13 +426,9 @@ async function toggleCoupon(id, enable) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ secret: ADMIN_SECRET, coupon_id: id, is_active: enable }),
         });
-        if (res.ok) {
-            showToast(enable ? "✅ Kupon faollashtirildi" : "🚫 Kupon o'chirildi");
-            loadCoupons();
-        }
-    } catch (e) {
-        showToast("❌ Xatolik");
-    }
+        if (res.ok) { toast(enable ? "✅ Kupon faollashtirildi" : "🚫 Kupon o'chirildi"); await loadCoupons(); }
+        else { toast("❌ Xatolik"); }
+    } catch (e) { toast("❌ Xatolik"); }
 }
 
 async function deleteCoupon(id) {
@@ -310,33 +439,90 @@ async function deleteCoupon(id) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ secret: ADMIN_SECRET, coupon_id: id }),
         });
-        if (res.ok) {
-            showToast("🗑️ Kupon o'chirildi");
-            loadCoupons();
-            loadStats();
-        }
-    } catch (e) {
-        showToast("❌ Xatolik");
-    }
+        if (res.ok) { toast("🗑️ Kupon o'chirildi!"); await loadCoupons(); await refreshStats(); }
+        else { toast("❌ Xatolik"); }
+    } catch (e) { toast("❌ Xatolik"); }
 }
 
-// ─── Generate Random Code ─────────────────────────────────────
-function generateRandomCode() {
+function generateCode() {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let code = "HSB-";
     for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
     document.getElementById("couponCode").value = code;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────
-function showToast(msg) {
-    const toast = document.getElementById("toast");
-    if (!toast) return;
-    toast.textContent = msg;
-    toast.classList.add("show");
-    setTimeout(() => toast.classList.remove("show"), 2500);
+// ─── Broadcast ────────────────────────────────────────────
+function setupBroadcastCharCount() {
+    const ta = document.getElementById("bcMessage");
+    const cc = document.getElementById("charCount");
+    if (ta && cc) {
+        ta.addEventListener("input", () => { cc.textContent = `${ta.value.length} belgi`; });
+    }
+}
+
+async function sendBroadcast() {
+    const message = document.getElementById("bcMessage").value.trim();
+    const target = document.querySelector('input[name="bcTarget"]:checked')?.value || "all";
+    const resultEl = document.getElementById("broadcastResult");
+
+    if (!message) { toast("❌ Xabar matnini kiriting!"); return; }
+
+    const btn = document.querySelector(".broadcast-send-btn");
+    btn.textContent = "⏳ Yuborilmoqda..."; btn.disabled = true;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/broadcast`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ secret: ADMIN_SECRET, admin_id: TG_USER_ID, message, target }),
+        });
+        const data = await res.json();
+        resultEl.classList.remove("hidden", "success", "error");
+        if (res.ok) {
+            resultEl.classList.add("success");
+            resultEl.textContent = `✅ Muvaffaqiyatli! ${data.sent || "?"} ta foydalanuvchiga yuborildi.`;
+            document.getElementById("bcMessage").value = "";
+            document.getElementById("charCount").textContent = "0 belgi";
+        } else {
+            resultEl.classList.add("error");
+            resultEl.textContent = `❌ ${data.error || "Xatolik yuz berdi"}`;
+        }
+    } catch (e) {
+        resultEl.classList.remove("hidden");
+        resultEl.classList.add("error");
+        resultEl.textContent = "❌ Server bilan bog'lanib bo'lmadi";
+    } finally {
+        btn.textContent = "📣 Xabar Yuborish"; btn.disabled = false;
+    }
+}
+
+// ─── Stats Refresh ────────────────────────────────────────
+async function refreshStats() {
+    try {
+        const res = await fetch(buildAdminUrl("/api/admin/stats"));
+        if (res.ok) updateKPI(await res.json());
+    } catch (e) { }
+}
+
+// ─── Helpers ──────────────────────────────────────────────
+function toast(msg) {
+    const el = document.getElementById("toast");
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add("show");
+    setTimeout(() => el.classList.remove("show"), 2800);
 }
 
 function escHtml(str) {
     return String(str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+const AVATAR_COLORS = ["#3d8ef8", "#22c55e", "#f5a623", "#a78bfa", "#f87171", "#06b6d4", "#fb923c"];
+function avatarColor(id) {
+    return AVATAR_COLORS[Number(id) % AVATAR_COLORS.length];
+}
+
+// Close modal on overlay click
+document.getElementById("userModal")?.addEventListener("click", function (e) {
+    if (e.target === this) closeModal();
+});
