@@ -3,12 +3,33 @@ import { bot } from "./bot.ts";
 import { supabase } from "./db.ts";
 
 const handleUpdate = webhookCallback(bot, "std/http");
+const ADMIN_SECRET = "hisobla_admin_2024";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
 };
+
+function jsonRes(data: any, status = 200) {
+    return new Response(JSON.stringify(data), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+}
+
+function checkAdmin(req: Request, url: URL): boolean {
+    const secret = url.searchParams.get("secret");
+    if (secret === ADMIN_SECRET) return true;
+    try {
+        const body = req.headers.get("content-type")?.includes("json") ? null : null;
+    } catch { }
+    return false;
+}
+
+function checkAdminPost(body: any): boolean {
+    return body?.secret === ADMIN_SECRET;
+}
 
 Deno.serve(async (req) => {
     const url = new URL(req.url);
@@ -177,6 +198,173 @@ Deno.serve(async (req) => {
                 }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // ADMIN API ENDPOINTS
+    // ═══════════════════════════════════════════════════════════
+
+    // GET /api/admin/stats
+    if (req.method === "GET" && url.pathname.endsWith("/api/admin/stats")) {
+        if (!checkAdmin(req, url)) return jsonRes({ error: "Unauthorized" }, 401);
+
+        const { count: totalUsers } = await supabase.from("users").select("*", { count: "exact", head: true });
+        const { count: premiumUsers } = await supabase.from("users").select("*", { count: "exact", head: true }).eq("is_premium", true);
+        const { count: totalTransactions } = await supabase.from("transactions").select("*", { count: "exact", head: true });
+        const { count: activeCoupons } = await supabase.from("coupons").select("*", { count: "exact", head: true }).eq("is_active", true);
+
+        return jsonRes({
+            total_users: totalUsers || 0,
+            premium_users: premiumUsers || 0,
+            total_transactions: totalTransactions || 0,
+            active_coupons: activeCoupons || 0,
+        });
+    }
+
+    // GET /api/admin/users
+    if (req.method === "GET" && url.pathname.endsWith("/api/admin/users")) {
+        if (!checkAdmin(req, url)) return jsonRes({ error: "Unauthorized" }, 401);
+
+        const { data } = await supabase.from("users").select("*").order("created_at", { ascending: false });
+        return jsonRes(data || []);
+    }
+
+    // POST /api/admin/toggle-premium
+    if (req.method === "POST" && url.pathname.endsWith("/api/admin/toggle-premium")) {
+        try {
+            const body = await req.json();
+            if (body.secret !== ADMIN_SECRET) return jsonRes({ error: "Unauthorized" }, 401);
+
+            await supabase.from("users").update({ is_premium: body.is_premium }).eq("user_id", body.user_id);
+            return jsonRes({ success: true });
+        } catch (e) {
+            return jsonRes({ error: "Failed" }, 400);
+        }
+    }
+
+    // POST /api/admin/reset-usage
+    if (req.method === "POST" && url.pathname.endsWith("/api/admin/reset-usage")) {
+        try {
+            const body = await req.json();
+            if (body.secret !== ADMIN_SECRET) return jsonRes({ error: "Unauthorized" }, 401);
+
+            await supabase.from("users").update({
+                usage_count: 0,
+                usage_reset_date: new Date().toISOString(),
+            }).eq("user_id", body.user_id);
+            return jsonRes({ success: true });
+        } catch (e) {
+            return jsonRes({ error: "Failed" }, 400);
+        }
+    }
+
+    // GET /api/admin/coupons
+    if (req.method === "GET" && url.pathname.endsWith("/api/admin/coupons")) {
+        if (!checkAdmin(req, url)) return jsonRes({ error: "Unauthorized" }, 401);
+
+        const { data } = await supabase.from("coupons").select("*").order("created_at", { ascending: false });
+        return jsonRes(data || []);
+    }
+
+    // POST /api/admin/coupons/create
+    if (req.method === "POST" && url.pathname.endsWith("/api/admin/coupons/create")) {
+        try {
+            const body = await req.json();
+            if (body.secret !== ADMIN_SECRET) return jsonRes({ error: "Unauthorized" }, 401);
+
+            // Check if code already exists
+            const { data: existing } = await supabase.from("coupons").select("id").eq("code", body.code).single();
+            if (existing) return jsonRes({ error: "Bu kod allaqachon mavjud!" }, 400);
+
+            const { error } = await supabase.from("coupons").insert({
+                code: body.code,
+                plan: body.plan,
+                max_uses: body.max_uses || 1,
+                expires_at: body.expires_at || null,
+                is_active: true,
+            });
+
+            if (error) return jsonRes({ error: error.message }, 400);
+            return jsonRes({ success: true });
+        } catch (e) {
+            return jsonRes({ error: "Failed" }, 400);
+        }
+    }
+
+    // POST /api/admin/coupons/toggle
+    if (req.method === "POST" && url.pathname.endsWith("/api/admin/coupons/toggle")) {
+        try {
+            const body = await req.json();
+            if (body.secret !== ADMIN_SECRET) return jsonRes({ error: "Unauthorized" }, 401);
+
+            await supabase.from("coupons").update({ is_active: body.is_active }).eq("id", body.coupon_id);
+            return jsonRes({ success: true });
+        } catch (e) {
+            return jsonRes({ error: "Failed" }, 400);
+        }
+    }
+
+    // POST /api/admin/coupons/delete
+    if (req.method === "POST" && url.pathname.endsWith("/api/admin/coupons/delete")) {
+        try {
+            const body = await req.json();
+            if (body.secret !== ADMIN_SECRET) return jsonRes({ error: "Unauthorized" }, 401);
+
+            await supabase.from("coupons").delete().eq("id", body.coupon_id);
+            return jsonRes({ success: true });
+        } catch (e) {
+            return jsonRes({ error: "Failed" }, 400);
+        }
+    }
+
+    // POST /api/coupon/activate (for end-users via Mini App)
+    if (req.method === "POST" && url.pathname.endsWith("/api/coupon/activate")) {
+        try {
+            const body = await req.json();
+            const { code, user_id } = body;
+            if (!code || !user_id) return jsonRes({ error: "Kod va user_id kerak" }, 400);
+
+            // Find active coupon
+            const { data: coupon } = await supabase.from("coupons")
+                .select("*")
+                .eq("code", code.toUpperCase())
+                .eq("is_active", true)
+                .single();
+
+            if (!coupon) return jsonRes({ error: "Kupon topilmadi yoki nofaol" }, 404);
+
+            // Check expiry
+            if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+                return jsonRes({ error: "Kupon muddati o'tib ketgan" }, 400);
+            }
+
+            // Check usage
+            if (coupon.used_count >= coupon.max_uses) {
+                return jsonRes({ error: "Kupon limiti tugagan" }, 400);
+            }
+
+            // Calculate premium duration
+            const planDays: Record<string, number> = {
+                "1_month": 30, "3_months": 90, "6_months": 180,
+                "1_year": 365, "lifetime": 36500,
+            };
+            const days = planDays[coupon.plan] || 30;
+
+            // Activate premium
+            await supabase.from("users").update({
+                is_premium: true,
+                usage_count: 0,
+            }).eq("user_id", user_id);
+
+            // Increment usage
+            await supabase.from("coupons").update({
+                used_count: coupon.used_count + 1,
+            }).eq("id", coupon.id);
+
+            return jsonRes({ success: true, plan: coupon.plan, days });
+        } catch (e) {
+            return jsonRes({ error: "Xatolik yuz berdi" }, 400);
         }
     }
 

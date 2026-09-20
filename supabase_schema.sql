@@ -48,12 +48,28 @@ CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_a
 CREATE INDEX IF NOT EXISTS idx_debts_user_id ON debts(user_id);
 CREATE INDEX IF NOT EXISTS idx_debts_due_date ON debts(due_date);
 
+-- Coupons table
+CREATE TABLE IF NOT EXISTS coupons (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    plan TEXT NOT NULL CHECK (plan IN ('1_month', '3_months', '6_months', '1_year', 'lifetime')),
+    max_uses INT DEFAULT 1,
+    used_count INT DEFAULT 0,
+    expires_at TIMESTAMPTZ,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_coupons_code ON coupons(code);
+
 -- Enable Row Level Security (RLS)
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE debts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE coupons ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations
 CREATE POLICY "Allow all for users" ON users FOR ALL USING (true);
 CREATE POLICY "Allow all for transactions" ON transactions FOR ALL USING (true);
 CREATE POLICY "Allow all for debts" ON debts FOR ALL USING (true);
+CREATE POLICY "Allow all for coupons" ON coupons FOR ALL USING (true);

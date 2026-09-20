@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hisobla – Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="admin.css" />
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="admin-header">
+        <div class="admin-header-content">
+            <div class="admin-brand">
+                <span class="admin-logo">⚙️</span>
+                <span class="admin-title">Hisobla Admin</span>
+            </div>
+            <div class="admin-user" id="adminUser">Admin</div>
+        </div>
+    </header>
+
+    <main class="admin-main">
+
+        <!-- Stats Overview -->
+        <section class="stats-grid" id="statsGrid">
+            <div class="stat-card glass-card">
+                <div class="stat-emoji">👥</div>
+                <div class="stat-number" id="statUsers">—</div>
+                <div class="stat-label">Foydalanuvchilar</div>
+            </div>
+            <div class="stat-card glass-card">
+                <div class="stat-emoji">👑</div>
+                <div class="stat-number" id="statPremium">—</div>
+                <div class="stat-label">Premium</div>
+            </div>
+            <div class="stat-card glass-card">
+                <div class="stat-emoji">📋</div>
+                <div class="stat-number" id="statTransactions">—</div>
+                <div class="stat-label">Tranzaksiyalar</div>
+            </div>
+            <div class="stat-card glass-card">
+                <div class="stat-emoji">🎟️</div>
+                <div class="stat-number" id="statCoupons">—</div>
+                <div class="stat-label">Faol kuponlar</div>
+            </div>
+        </section>
+
+        <!-- Admin Tabs -->
+        <nav class="admin-tabs">
+            <button class="admin-tab-btn active" data-tab="users">👥 Foydalanuvchilar</button>
+            <button class="admin-tab-btn" data-tab="coupons">🎟️ Kuponlar</button>
+        </nav>
+
+        <!-- Users Tab -->
+        <div class="admin-tab-content active" id="tab-users">
+            <div class="section-header">
+                <h3>👥 Barcha foydalanuvchilar</h3>
+                <input type="text" class="search-input" id="userSearch"
+                    placeholder="🔍 Qidirish (ism, username, ID)..." />
+            </div>
+            <div class="table-wrap">
+                <table class="admin-table" id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Ism</th>
+                            <th>Username</th>
+                            <th>Holat</th>
+                            <th>Xabarlar</th>
+                            <th>Ro'yxatdan</th>
+                            <th>Boshqarish</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <tr>
+                            <td colspan="7" class="loading-cell">Yuklanmoqda...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Coupons Tab -->
+        <div class="admin-tab-content" id="tab-coupons">
+            <div class="section-header">
+                <h3>🎟️ Kupon kodlar</h3>
+            </div>
+
+            <!-- Create Coupon Form -->
+            <div class="coupon-form glass-card">
+                <h4>➕ Yangi kupon yaratish</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Kupon kodi</label>
+                        <div class="code-input-wrap">
+                            <input type="text" id="couponCode" placeholder="Masalan: HISOBLA50" />
+                            <button class="gen-btn" onclick="generateRandomCode()">🎲</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Tarif turi</label>
+                        <select id="couponPlan">
+                            <option value="1_month">1 Oylik (15,000)</option>
+                            <option value="3_months">3 Oylik (40,000)</option>
+                            <option value="6_months">6 Oylik (70,000)</option>
+                            <option value="1_year">1 Yillik (130,000)</option>
+                            <option value="lifetime">Umrbod (300,000)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Ishlatish limiti</label>
+                        <input type="number" id="couponLimit" value="1" min="1" max="10000" />
+                    </div>
+                    <div class="form-group">
+                        <label>Amal qilish sanasi</label>
+                        <input type="date" id="couponExpiry" />
+                    </div>
+                </div>
+                <button class="create-coupon-btn" onclick="createCoupon()">🎟️ Kupon yaratish</button>
+            </div>
+
+            <!-- Coupons List -->
+            <div class="table-wrap">
+                <table class="admin-table" id="couponsTable">
+                    <thead>
+                        <tr>
+                            <th>Kod</th>
+                            <th>Tarif</th>
+                            <th>Ishlatilgan</th>
+                            <th>Limit</th>
+                            <th>Muddat</th>
+                            <th>Holat</th>
+                            <th>Boshqarish</th>
+                        </tr>
+                    </thead>
+                    <tbody id="couponsTableBody">
+                        <tr>
+                            <td colspan="7" class="loading-cell">Yuklanmoqda...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script src="admin.js"></script>
+</body>
+
+</html>
