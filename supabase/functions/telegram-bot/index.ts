@@ -187,6 +187,8 @@ Deno.serve(async (req) => {
                 .select("*")
                 .eq("user_id", userId);
 
+            const { data: userData } = await supabase.from("users").select("is_premium, premium_expires_at").eq("user_id", userId).single();
+
             const transactions = data || [];
             const totalIncome = transactions
                 .filter((t) => t.type === "income")
@@ -213,6 +215,8 @@ Deno.serve(async (req) => {
                     total_expense: totalExpense,
                     balance,
                     categories,
+                    is_premium: userData?.is_premium || false,
+                    premium_expires_at: userData?.premium_expires_at || null,
                 }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
@@ -410,6 +414,8 @@ Deno.serve(async (req) => {
                 return jsonRes({ error: "Kupon limiti tugagan" }, 400);
             }
 
+            const discount = coupon.discount_percent ?? 100;
+
             // Calculate premium duration
             const planDays: Record<string, number> = {
                 "1_month": 30, "3_months": 90, "6_months": 180,
@@ -417,18 +423,29 @@ Deno.serve(async (req) => {
             };
             const days = planDays[coupon.plan] || 30;
 
-            // Activate premium
-            await supabase.from("users").update({
-                is_premium: true,
-                usage_count: 0,
-            }).eq("user_id", user_id);
+            if (discount === 100) {
+                // If 100% discount, activate premium immediately
+                // Calculate expiry from now or extend existing
+                const { data: userObj } = await supabase.from("users").select("premium_expires_at").eq("user_id", user_id).single();
+                let newExpiry = new Date();
+                if (userObj?.premium_expires_at && new Date(userObj.premium_expires_at) > new Date()) {
+                    newExpiry = new Date(userObj.premium_expires_at);
+                }
+                newExpiry.setDate(newExpiry.getDate() + days);
+
+                await supabase.from("users").update({
+                    is_premium: true,
+                    usage_count: 0,
+                    premium_expires_at: newExpiry.toISOString()
+                }).eq("user_id", user_id);
+            }
 
             // Increment usage
             await supabase.from("coupons").update({
                 used_count: coupon.used_count + 1,
             }).eq("id", coupon.id);
 
-            return jsonRes({ success: true, plan: coupon.plan, days });
+            return jsonRes({ success: true, plan: coupon.plan, days, discount });
         } catch (e) {
             return jsonRes({ error: "Xatolik yuz berdi" }, 400);
         }

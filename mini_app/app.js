@@ -104,6 +104,36 @@ async function loadSummary(isSilent = false) {
         document.getElementById("totalIncome").textContent = formatAmount(data.total_income || 0);
         document.getElementById("totalExpense").textContent = formatAmount(data.total_expense || 0);
 
+        const pBtn = document.getElementById("headerPremiumBtn");
+        const pExp = document.getElementById("premiumExpiryText");
+
+        if (data.is_premium) {
+            pBtn.innerHTML = `<span class="premium-ico">👑</span> PRO YONIQ`;
+            pBtn.classList.add("active-pro");
+
+            if (data.premium_expires_at) {
+                const diffTime = new Date(data.premium_expires_at) - new Date();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays > 3600) {
+                    pExp.textContent = "Umrbod PRO faol ✨";
+                } else if (diffDays > 0) {
+                    pExp.textContent = `${diffDays} kun qoldi`;
+                } else {
+                    pExp.textContent = "Muddati tugagan";
+                }
+                pExp.classList.remove("hidden");
+            } else {
+                // Legacy premium flag support
+                pExp.textContent = "PRO faol ✨";
+                pExp.classList.remove("hidden");
+            }
+        } else {
+            pBtn.innerHTML = `<span class="premium-ico">⭐</span> PRO QO'SHISH`;
+            pBtn.classList.remove("active-pro");
+            pExp.classList.add("hidden");
+        }
+
         renderCharts(data.categories || []);
     } catch (e) {
         if (!isSilent) console.error("Summary load failed:", e);
@@ -465,9 +495,13 @@ async function activateCoupon() {
         const data = await res.json();
 
         if (res.ok && data.success) {
-            showToast("🎉 Premium muvaffaqiyatli faollashtirildi! 👑");
+            if (data.discount === 100) {
+                showToast("🎉 Premium muvaffaqiyatli faollashtirildi! 👑");
+                loadSummary(false);
+            } else {
+                showToast(`🎉 ${data.discount}% Chegirma muvaffaqiyatli qo'llanildi! To'lov bo'limi tez orada ulanadi.`);
+            }
             if (input) input.value = "";
-            loadSummary(false);
         } else {
             showToast(`❌ ${data.error || "Kupon nofaol yoki noto'g'ri"}`);
         }
@@ -475,4 +509,11 @@ async function activateCoupon() {
         console.error("Coupon activate error:", e);
         showToast("❌ Xatolik yuz berdi");
     }
+}
+
+function openPremiumTab() {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+    const premiumTab = document.getElementById("tab-premium");
+    if (premiumTab) premiumTab.classList.add("active");
 }

@@ -208,6 +208,10 @@
                         <input type="number" id="couponLimit" class="form-input" value="1" min="1" max="9999" />
                     </div>
                     <div class="form-group">
+                        <label>Chegirma foizi (%)</label>
+                        <input type="number" id="couponDiscount" class="form-input" value="100" min="1" max="100" />
+                    </div>
+                    <div class="form-group">
                         <label>Amal Qilish Sanasi</label>
                         <input type="date" id="couponExpiry" class="form-input" />
                     </div>
@@ -226,6 +230,7 @@
                             <tr>
                                 <th>Kod</th>
                                 <th>Tarif</th>
+                                <th>Chegirma</th>
                                 <th>Foydalanish</th>
                                 <th>Muddat</th>
                                 <th>Holat</th>
@@ -234,7 +239,7 @@
                         </thead>
                         <tbody id="couponsBody">
                             <tr>
-                                <td colspan="6" class="empty-cell">Yuklanmoqda...</td>
+                                <td colspan="7" class="empty-cell">Yuklanmoqda...</td>
                             </tr>
                         </tbody>
                     </table>

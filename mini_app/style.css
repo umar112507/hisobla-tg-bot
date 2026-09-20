@@ -180,6 +180,45 @@ body {
   font-weight: 400;
 }
 
+.user-header-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.header-premium-btn {
+  font-size: 10px;
+  font-weight: 700;
+  background: linear-gradient(135deg, rgba(31, 35, 51, 0.8), rgba(21, 24, 36, 0.8));
+  padding: 3px 8px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  color: #ffd700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.header-premium-btn:active {
+  transform: scale(0.95);
+}
+
+.header-premium-btn.active-pro {
+  background: linear-gradient(135deg, #ffd700, #ff8c00);
+  color: #000;
+  border: none;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+.premium-expiry-text {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 3px;
+}
+
 .app-logo {
   display: flex;
   align-items: center;

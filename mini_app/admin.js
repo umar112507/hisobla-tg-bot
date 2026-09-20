@@ -388,6 +388,7 @@ function renderCoupons(coupons) {
         return `<tr>
           <td><span class="coupon-code">${escHtml(c.code)}</span></td>
           <td style="font-size:12px">${PLAN_NAMES[c.plan] || c.plan}</td>
+          <td style="font-size:12px; font-weight: 600; color: var(--gold)">${c.discount_percent ?? 100}%</td>
           <td style="font-size:12px">${c.used_count} / ${c.max_uses}</td>
           <td style="font-size:12px;color:var(--text-muted)">${expiry ? expiry.toLocaleDateString("uz-UZ") : "—"}</td>
           <td>${badge}</td>
