@@ -32,14 +32,20 @@
           <span class="online-indicator"></span>
         </div>
         <div class="user-details">
-          <div class="user-name" id="userName">Yuklanmoqda...</div>
-          <div class="user-header-bottom">
-            <div class="user-username" id="userUsername">@username</div>
-            <button id="headerPremiumBtn" class="header-premium-btn" onclick="openPremiumTab()">
-              <span class="premium-ico">⭐</span> PRO QO'SHISH
+          <div class="user-name-row">
+            <span class="user-name" id="userName">Yuklanmoqda...</span>
+            <button id="headerPremiumBtn" class="header-premium-btn pro-get-btn" onclick="openPremiumTab()">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                <path
+                  d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+              </svg>
+              <span id="proBtnText">PRO 'ga o'tish</span>
             </button>
           </div>
-          <div id="premiumExpiryText" class="premium-expiry-text hidden"></div>
+          <div class="user-sub-row">
+            <span class="user-username" id="userUsername">@username</span>
+            <span id="premiumExpiryText" class="premium-expiry-badge hidden"></span>
+          </div>
         </div>
       </div>
       <div class="app-logo">

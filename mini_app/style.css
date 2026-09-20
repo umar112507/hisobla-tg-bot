@@ -165,6 +165,14 @@ body {
 .user-details {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.user-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .user-name {
@@ -174,43 +182,58 @@ body {
   letter-spacing: -0.2px;
 }
 
+.user-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .user-username {
   font-size: 11px;
   color: var(--text-secondary);
   font-weight: 400;
 }
 
-.user-header-bottom {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 3px;
-}
-
 .header-premium-btn {
   font-size: 10px;
   font-weight: 700;
-  background: linear-gradient(135deg, rgba(31, 35, 51, 0.8), rgba(21, 24, 36, 0.8));
-  padding: 3px 8px;
-  border-radius: 12px;
-  display: flex;
+  padding: 3px 9px;
+  border-radius: 20px;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid rgba(255, 215, 0, 0.3);
-  color: #ffd700;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.2px;
 }
 
 .header-premium-btn:active {
-  transform: scale(0.95);
+  transform: scale(0.94);
 }
 
-.header-premium-btn.active-pro {
-  background: linear-gradient(135deg, #ffd700, #ff8c00);
-  color: #000;
-  border: none;
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+.header-premium-btn.pro-get-btn {
+  background: rgba(68, 138, 255, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  box-shadow: 0 0 12px rgba(68, 138, 255, 0.15);
+}
+
+.header-premium-btn.pro-get-btn:hover {
+  background: rgba(68, 138, 255, 0.22);
+  border-color: rgba(96, 165, 250, 0.6);
+}
+
+.header-premium-btn.pro-active-badge {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.18), rgba(245, 158, 11, 0.18));
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.2);
+}
+
+.premium-expiry-badge {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 215, 0, 0.85);
 }
 
 .premium-expiry-text {

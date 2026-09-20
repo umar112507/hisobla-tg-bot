@@ -108,29 +108,28 @@ async function loadSummary(isSilent = false) {
         const pExp = document.getElementById("premiumExpiryText");
 
         if (data.is_premium) {
-            pBtn.innerHTML = `<span class="premium-ico">👑</span> PRO YONIQ`;
-            pBtn.classList.add("active-pro");
+            pBtn.className = "header-premium-btn pro-active-badge";
+            pBtn.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg> <span>PRO</span>`;
 
             if (data.premium_expires_at) {
                 const diffTime = new Date(data.premium_expires_at) - new Date();
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
                 if (diffDays > 3600) {
-                    pExp.textContent = "Umrbod PRO faol ✨";
+                    pExp.textContent = "· Umrbod PRO";
                 } else if (diffDays > 0) {
-                    pExp.textContent = `${diffDays} kun qoldi`;
+                    pExp.textContent = `· ${diffDays} kun qoldi`;
                 } else {
-                    pExp.textContent = "Muddati tugagan";
+                    pExp.textContent = "· Muddati tugagan";
                 }
                 pExp.classList.remove("hidden");
             } else {
-                // Legacy premium flag support
-                pExp.textContent = "PRO faol ✨";
+                pExp.textContent = "· PRO active";
                 pExp.classList.remove("hidden");
             }
         } else {
-            pBtn.innerHTML = `<span class="premium-ico">⭐</span> PRO QO'SHISH`;
-            pBtn.classList.remove("active-pro");
+            pBtn.className = "header-premium-btn pro-get-btn";
+            pBtn.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> <span>PRO 'ga o'tish</span>`;
             pExp.classList.add("hidden");
         }
 
