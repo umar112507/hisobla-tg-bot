@@ -14,7 +14,9 @@ bot.command("start", async (ctx) => {
 
     const ADMIN_IDS_STR = Deno.env.get("ADMIN_IDS") || "";
     const ALLOWED_ADMIN_IDS = ADMIN_IDS_STR.split(",").map((s: string) => s.trim()).filter(Boolean);
-    const isAdmin = ALLOWED_ADMIN_IDS.length === 0 || ALLOWED_ADMIN_IDS.includes(String(user.id));
+    // Admin tugmasi FAQAT ADMIN_IDS ro'yxatida bo'lgan userlarga ko'rinadi
+    // Agar ADMIN_IDS bo'sh bo'lsa — hech kimga admin tugmasi chiqmaydi
+    const isAdmin = ALLOWED_ADMIN_IDS.length > 0 && ALLOWED_ADMIN_IDS.includes(String(user.id));
 
     const kb = new InlineKeyboard()
         .webApp("📊 ILOVAN-ni ochish", `${MINI_APP_URL}?user_id=${user.id}`);
