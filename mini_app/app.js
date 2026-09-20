@@ -112,22 +112,15 @@ async function loadSummary(isSilent = false) {
             pBtn.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg> <span>PRO</span>`;
 
             if (data.premium_expires_at) {
-                const diffTime = new Date(data.premium_expires_at) - new Date();
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                if (diffDays > 3600) {
-                    pExp.textContent = "· Umrbod PRO";
-                } else if (diffDays > 0) {
-                    pExp.textContent = `· ${diffDays} kun qoldi`;
-                } else {
-                    pExp.textContent = "· Muddati tugagan";
-                }
+                startLiveTicker(data.premium_expires_at);
                 pExp.classList.remove("hidden");
             } else {
+                if (liveTickerTimer) clearInterval(liveTickerTimer);
                 pExp.textContent = "· PRO active";
                 pExp.classList.remove("hidden");
             }
         } else {
+            if (liveTickerTimer) clearInterval(liveTickerTimer);
             pBtn.className = "header-premium-btn pro-get-btn";
             pBtn.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> <span>PRO 'ga o'tish</span>`;
             pExp.classList.add("hidden");
@@ -473,8 +466,63 @@ function showEmptyAll(msg) {
     document.getElementById("debtsList").innerHTML = emptyState(warningSvg, msg);
 }
 
+let liveTickerTimer = null;
+
+function startLiveTicker(expiryIsoStr) {
+    if (liveTickerTimer) clearInterval(liveTickerTimer);
+
+    const updateTicker = () => {
+        const pExp = document.getElementById("premiumExpiryText");
+        const diffMs = new Date(expiryIsoStr) - new Date();
+        const diffSec = Math.ceil(diffMs / 1000);
+
+        if (diffSec <= 0) {
+            if (pExp) pExp.textContent = "· Muddati tugagan";
+            clearInterval(liveTickerTimer);
+            liveTickerTimer = null;
+            loadSummary(true);
+            return;
+        }
+
+        if (diffSec <= 60) {
+            if (pExp) pExp.textContent = `· ${diffSec} sek qoldi`;
+        } else {
+            const diffDays = Math.ceil(diffSec / 86400);
+            if (pExp) pExp.textContent = `· ${diffDays} kun qoldi`;
+        }
+    };
+
+    updateTicker();
+    liveTickerTimer = setInterval(updateTicker, 1000);
+}
+
 // ─── Premium Actions ──────────────────────────────────────────
-function buyPremium(planId) {
+async function buyPremium(planId) {
+    if (planId === "test_10s") {
+        if (!USER_ID) {
+            showToast("❌ Telegram ID topilmadi");
+            return;
+        }
+        try {
+            const res = await fetch(`${API_BASE}/api/premium/test-buy`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: USER_ID, seconds: 10 }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showToast("⚡ 10 sekundlik SINOV TARIFI faollashtirildi! ⏱️");
+                loadSummary(false);
+            } else {
+                showToast(`❌ ${data.error || "Xatolik yuz berdi"}`);
+            }
+        } catch (e) {
+            console.error("Test buy error:", e);
+            showToast("❌ Xatolik yuz berdi");
+        }
+        return;
+    }
+
     showToast("💳 To'lov xizmati (inpay.uz) tez orada ulanadi! 🔥");
 }
 

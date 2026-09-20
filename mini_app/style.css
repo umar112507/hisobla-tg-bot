@@ -1011,6 +1011,23 @@ body {
   color: #fff;
 }
 
+.pricing-card.test-card {
+  border: 1px dashed rgba(0, 212, 255, 0.4);
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.08), rgba(68, 138, 255, 0.05));
+}
+
+.test-badge {
+  background: linear-gradient(135deg, #00d4ff, #448aff) !important;
+  color: #000 !important;
+}
+
+.test-btn {
+  background: linear-gradient(135deg, #00d4ff, #448aff) !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 14px rgba(0, 212, 255, 0.3) !important;
+}
+
 .pricing-title {
   font-size: 16px;
   font-weight: 600;

@@ -189,6 +189,16 @@ Deno.serve(async (req) => {
 
             const { data: userData } = await supabase.from("users").select("is_premium, premium_expires_at").eq("user_id", userId).single();
 
+            let isPremium = userData?.is_premium || false;
+            let premiumExpiresAt = userData?.premium_expires_at || null;
+
+            if (isPremium && premiumExpiresAt) {
+                if (new Date(premiumExpiresAt) <= new Date()) {
+                    isPremium = false;
+                    await supabase.from("users").update({ is_premium: false }).eq("user_id", userId);
+                }
+            }
+
             const transactions = data || [];
             const totalIncome = transactions
                 .filter((t) => t.type === "income")
@@ -215,8 +225,8 @@ Deno.serve(async (req) => {
                     total_expense: totalExpense,
                     balance,
                     categories,
-                    is_premium: userData?.is_premium || false,
-                    premium_expires_at: userData?.premium_expires_at || null,
+                    is_premium: isPremium,
+                    premium_expires_at: premiumExpiresAt,
                 }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
@@ -446,6 +456,27 @@ Deno.serve(async (req) => {
             }).eq("id", coupon.id);
 
             return jsonRes({ success: true, plan: coupon.plan, days, discount });
+        } catch (e) {
+            return jsonRes({ error: "Xatolik yuz berdi" }, 400);
+        }
+    }
+
+    // POST /api/premium/test-buy (Activate 10s test premium instantly)
+    if (req.method === "POST" && url.pathname.endsWith("/api/premium/test-buy")) {
+        try {
+            const body = await req.json();
+            const { user_id, seconds = 10 } = body;
+            if (!user_id) return jsonRes({ error: "user_id kerak" }, 400);
+
+            const newExpiry = new Date(Date.now() + seconds * 1000);
+
+            await supabase.from("users").update({
+                is_premium: true,
+                usage_count: 0,
+                premium_expires_at: newExpiry.toISOString()
+            }).eq("user_id", user_id);
+
+            return jsonRes({ success: true, seconds, expires_at: newExpiry.toISOString() });
         } catch (e) {
             return jsonRes({ error: "Xatolik yuz berdi" }, 400);
         }
