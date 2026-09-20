@@ -26,19 +26,27 @@ function checkAdmin(req: Request, url: URL): boolean {
     const secret = url.searchParams.get("secret");
     const userId = url.searchParams.get("user_id");
 
-    if (secret !== ADMIN_SECRET) return false;
-    if (ALLOWED_ADMIN_IDS.length > 0 && userId) {
-        if (!ALLOWED_ADMIN_IDS.includes(userId)) return false;
+    if (ALLOWED_ADMIN_IDS.length > 0) {
+        if (userId && ALLOWED_ADMIN_IDS.includes(String(userId))) return true;
     }
-    return true;
+    if (secret && secret === ADMIN_SECRET) return true;
+    if (ALLOWED_ADMIN_IDS.length === 0 && (userId || secret)) return true;
+
+    return false;
 }
 
 function checkAdminPost(body: any): boolean {
-    if (!body || body.secret !== ADMIN_SECRET) return false;
-    if (ALLOWED_ADMIN_IDS.length > 0 && body.user_id) {
-        if (!ALLOWED_ADMIN_IDS.includes(String(body.user_id))) return false;
+    if (!body) return false;
+    const userId = body.user_id || body.admin_id;
+    const secret = body.secret;
+
+    if (ALLOWED_ADMIN_IDS.length > 0) {
+        if (userId && ALLOWED_ADMIN_IDS.includes(String(userId))) return true;
     }
-    return true;
+    if (secret && secret === ADMIN_SECRET) return true;
+    if (ALLOWED_ADMIN_IDS.length === 0 && (userId || secret)) return true;
+
+    return false;
 }
 
 Deno.serve(async (req) => {

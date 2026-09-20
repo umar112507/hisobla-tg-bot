@@ -1,33 +1,20 @@
 // ─── Config ───────────────────────────────────────────────────
 const API_BASE = "https://dyqmawwyooeqadibnpqc.supabase.co/functions/v1/telegram-bot";
 const tg = window.Telegram?.WebApp;
-let ADMIN_SECRET = localStorage.getItem("admin_secret") || "";
 
-// Check URL params for secret or user_id
+// Check URL params or Telegram WebApp user object
 const params = new URLSearchParams(window.location.search);
-if (params.get("secret")) {
-    ADMIN_SECRET = params.get("secret");
-    localStorage.setItem("admin_secret", ADMIN_SECRET);
-}
-const TG_USER_ID = tg?.initDataUnsafe?.user?.id || params.get("user_id") || "";
+const TG_USER_ID = tg?.initDataUnsafe?.user?.id || params.get("user_id") || params.get("id") || "";
+const ADMIN_SECRET = params.get("secret") || "hisobla_admin_2024";
 
 let allUsers = [];
 let allCoupons = [];
 
 document.addEventListener("DOMContentLoaded", async () => {
     setupTabs();
-    setupAuthListeners();
+    await verifyAdminAndLoad();
 
-    if (ADMIN_SECRET) {
-        const ok = await verifyAndLoad(ADMIN_SECRET);
-        if (!ok) {
-            showAuthOverlay();
-        }
-    } else {
-        showAuthOverlay();
-    }
-
-    document.getElementById("userSearch").addEventListener("input", (e) => {
+    document.getElementById("userSearch")?.addEventListener("input", (e) => {
         filterUsers(e.target.value);
     });
 
@@ -38,56 +25,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (expiryEl) expiryEl.value = expDate.toISOString().split("T")[0];
 });
 
-function setupAuthListeners() {
-    const input = document.getElementById("secretInput");
-    if (input) {
-        input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") authenticateAdmin();
-        });
-    }
-}
-
-function showAuthOverlay() {
-    document.getElementById("authOverlay")?.classList.remove("hidden");
-}
-
-function hideAuthOverlay() {
-    document.getElementById("authOverlay")?.classList.add("hidden");
-}
-
-async function authenticateAdmin() {
-    const secret = document.getElementById("secretInput").value.trim();
-    const errEl = document.getElementById("authError");
-    errEl.textContent = "";
-
-    if (!secret) {
-        errEl.textContent = "❌ Maxfiy parolni kiriting!";
-        return;
-    }
-
-    const ok = await verifyAndLoad(secret);
-    if (ok) {
-        ADMIN_SECRET = secret;
-        localStorage.setItem("admin_secret", secret);
-        hideAuthOverlay();
-    } else {
-        errEl.textContent = "❌ Noto'g'ri maxfiy parol yoki ruxsat yo'q!";
-    }
-}
-
-function logoutAdmin() {
-    localStorage.removeItem("admin_secret");
-    ADMIN_SECRET = "";
-    showAuthOverlay();
-}
-
-async function verifyAndLoad(secret) {
+async function verifyAdminAndLoad() {
     try {
-        let url = `${API_BASE}/api/admin/stats?secret=${encodeURIComponent(secret)}`;
-        if (TG_USER_ID) url += `&user_id=${TG_USER_ID}`;
-
+        let url = `${API_BASE}/api/admin/stats?user_id=${TG_USER_ID}&secret=${encodeURIComponent(ADMIN_SECRET)}`;
         const res = await fetch(url);
-        if (!res.ok) return false;
+
+        if (!res.ok) {
+            showAccessDenied();
+            return;
+        }
 
         const data = await res.json();
         document.getElementById("statUsers").textContent = data.total_users || 0;
@@ -95,14 +41,28 @@ async function verifyAndLoad(secret) {
         document.getElementById("statTransactions").textContent = data.total_transactions || 0;
         document.getElementById("statCoupons").textContent = data.active_coupons || 0;
 
-        hideAuthOverlay();
+        hideAccessDenied();
         loadUsers();
         loadCoupons();
-        return true;
     } catch (e) {
-        console.error("Auth verify failed:", e);
-        return false;
+        console.error("Admin verify failed:", e);
+        showAccessDenied();
     }
+}
+
+function showAccessDenied() {
+    const overlay = document.getElementById("accessDeniedOverlay");
+    const text = document.getElementById("accessDeniedText");
+    if (overlay) overlay.classList.remove("hidden");
+    if (text) {
+        text.textContent = TG_USER_ID
+            ? `🚫 Sizning Telegram ID (#${TG_USER_ID}) Adminlar ro'yxatida topilmadi.`
+            : "🚫 Kirish taqiqlangan. Ushbu sahifani Telegram bot orqali oching.";
+    }
+}
+
+function hideAccessDenied() {
+    document.getElementById("accessDeniedOverlay")?.classList.add("hidden");
 }
 
 // ─── Tabs ─────────────────────────────────────────────────────
@@ -136,11 +96,10 @@ async function loadStats() {
 
 // ─── Load Users ───────────────────────────────────────────────
 async function loadUsers() {
-    if (!ADMIN_SECRET) return;
     try {
-        let url = `${API_BASE}/api/admin/users?secret=${encodeURIComponent(ADMIN_SECRET)}`;
-        if (TG_USER_ID) url += `&user_id=${TG_USER_ID}`;
+        let url = `${API_BASE}/api/admin/users?user_id=${TG_USER_ID}&secret=${encodeURIComponent(ADMIN_SECRET)}`;
         const res = await fetch(url);
+        if (!res.ok) return;
         allUsers = await res.json();
         renderUsers(allUsers);
     } catch (e) {
@@ -235,11 +194,10 @@ async function resetUsage(userId) {
 
 // ─── Load Coupons ─────────────────────────────────────────────
 async function loadCoupons() {
-    if (!ADMIN_SECRET) return;
     try {
-        let url = `${API_BASE}/api/admin/coupons?secret=${encodeURIComponent(ADMIN_SECRET)}`;
-        if (TG_USER_ID) url += `&user_id=${TG_USER_ID}`;
+        let url = `${API_BASE}/api/admin/coupons?user_id=${TG_USER_ID}&secret=${encodeURIComponent(ADMIN_SECRET)}`;
         const res = await fetch(url);
+        if (!res.ok) return;
         allCoupons = await res.json();
         renderCoupons(allCoupons);
     } catch (e) {
