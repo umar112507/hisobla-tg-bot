@@ -25,17 +25,16 @@
   <!-- Header with Telegram User Profile -->
   <header class="header">
     <div class="header-content">
-      <div class="user-profile" id="userProfile" onclick="openProfileModal()">
-        <div class="user-avatar-wrap">
+      <div class="user-profile" id="userProfile">
+        <div class="user-avatar-wrap" onclick="openProfileModal()">
           <img id="userAvatar" src="https://ui-avatars.com/api/?name=User&background=448aff&color=fff" alt="Avatar"
             class="user-avatar" />
           <span class="online-indicator"></span>
         </div>
         <div class="user-details">
           <div class="user-name-row">
-            <span class="user-name" id="userName">Yuklanmoqda...</span>
-            <button id="headerPremiumBtn" class="header-premium-btn pro-get-btn"
-              onclick="event.stopPropagation(); openPremiumModal()">
+            <span class="user-name clickable" id="userName" onclick="openProfileModal()">Yuklanmoqda...</span>
+            <button id="headerPremiumBtn" class="header-premium-btn pro-get-btn" onclick="openPremiumModal()">
               <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
                 <path
                   d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />

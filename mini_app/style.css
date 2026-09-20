@@ -162,6 +162,34 @@ body {
   border-radius: 50%;
 }
 
+button,
+.tab-btn,
+.header-premium-btn,
+.pricing-btn,
+.modal-close-btn,
+.coupon-activate-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.user-avatar-wrap {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.user-avatar-wrap:active {
+  transform: scale(0.92);
+}
+
+.user-name.clickable {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.user-name.clickable:hover {
+  color: #60a5fa;
+}
+
 .user-details {
   display: flex;
   flex-direction: column;
