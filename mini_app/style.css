@@ -318,13 +318,24 @@ body {
   gap: 8px;
   margin-bottom: 16px;
   background: var(--bg-card);
-  border: 1px solid var(--border-color);
+  border: var(--glass-border);
   border-radius: var(--radius-pill);
   padding: 4px;
+  overflow-x: auto;
+  white-space: nowrap;
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-btn {
   flex: 1;
+  flex-shrink: 0;
   background: transparent;
   border: none;
   color: var(--text-secondary);
