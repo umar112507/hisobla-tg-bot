@@ -75,6 +75,9 @@
       <button class="tab-btn" data-tab="statistics">
         <span>📊</span> Statistika
       </button>
+      <button class="tab-btn premium-tab-btn" data-tab="premium">
+        <span>👑</span> Premium
+      </button>
     </nav>
 
     <!-- Transactions Tab -->
@@ -124,6 +127,63 @@
             <canvas id="incomeChart"></canvas>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Premium Tab -->
+    <div class="tab-content" id="tab-premium">
+      <div class="premium-header">
+        <h2>👑 Cheksiz Imkoniyatlar</h2>
+        <p>Ajoyib! Atigi shu pul evaziga butun moliyangizni aqlli boshqaring. 🚀<br>Biz tinimsiz kuchayishda va yangi
+          xususiyatlar qo'shishda davom etamiz, siz esa shunchaki bizni qo'llab-quvvatlashda davom etsangiz bas!</p>
+      </div>
+
+      <div class="pricing-container">
+
+        <!-- 1 Oy -->
+        <div class="pricing-card glass-card silver">
+          <div class="pricing-title">1 Oylik</div>
+          <div class="pricing-price">15,000 <span class="currency">so'm</span></div>
+          <div class="pricing-daily">Kuniga atigi ~500 so'm</div>
+          <button class="pricing-btn" onclick="buyPremium('1_month')">Xarid qilish</button>
+        </div>
+
+        <!-- 3 Oy -->
+        <div class="pricing-card glass-card gold">
+          <div class="pricing-badge">🔥 11% Tejamkorlik</div>
+          <div class="pricing-title">3 Oylik</div>
+          <div class="pricing-price">40,000 <span class="currency">so'm</span></div>
+          <div class="pricing-daily">Kuniga ~444 so'm</div>
+          <button class="pricing-btn gold-btn" onclick="buyPremium('3_months')">Xarid qilish</button>
+        </div>
+
+        <!-- 6 Oy -->
+        <div class="pricing-card glass-card emerald">
+          <div class="pricing-badge">💸 22% Tejamkorlik</div>
+          <div class="pricing-title">6 Oylik</div>
+          <div class="pricing-price">70,000 <span class="currency">so'm</span></div>
+          <div class="pricing-daily">Kuniga ~388 so'm</div>
+          <button class="pricing-btn emerald-btn" onclick="buyPremium('6_months')">Xarid qilish</button>
+        </div>
+
+        <!-- 1 Yil -->
+        <div class="pricing-card glass-card ruby popular">
+          <div class="pricing-badge popular-badge">⭐ Eng mashhur (28% Tejamkor)</div>
+          <div class="pricing-title">1 Yillik</div>
+          <div class="pricing-price">130,000 <span class="currency">so'm</span></div>
+          <div class="pricing-daily">Kuniga bor yo'g'i ~356 so'm!</div>
+          <button class="pricing-btn ruby-btn" onclick="buyPremium('1_year')">Xarid qilish</button>
+        </div>
+
+        <!-- Butun umrlik -->
+        <div class="pricing-card glass-card diamond">
+          <div class="pricing-badge diamond-badge">💎 MAXSUS TAKLIF</div>
+          <div class="pricing-title">Butun umrlik</div>
+          <div class="pricing-price">300,000 <span class="currency">so'm</span></div>
+          <div class="pricing-daily">Bir marta to'lang, umrbod foydalaning!</div>
+          <button class="pricing-btn diamond-btn" onclick="buyPremium('lifetime')">Xarid qilish</button>
+        </div>
+
       </div>
     </div>
 

@@ -437,3 +437,8 @@ function showEmptyAll(msg) {
     document.getElementById("transactionsList").innerHTML = emptyState("⚠️", msg);
     document.getElementById("debtsList").innerHTML = emptyState("⚠️", msg);
 }
+
+// ─── Premium Actions ──────────────────────────────────────────
+function buyPremium(planId) {
+    showToast("💳 To'lov xizmati (inpay.uz) tez orada ulanadi! 🔥");
+}
