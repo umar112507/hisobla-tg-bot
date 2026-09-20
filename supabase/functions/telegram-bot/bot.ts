@@ -12,8 +12,17 @@ bot.command("start", async (ctx) => {
     const user = ctx.from!;
     await ensureUser(user.id, user.username, user.first_name, user.last_name);
 
+    const ADMIN_IDS_STR = Deno.env.get("ADMIN_IDS") || "";
+    const ALLOWED_ADMIN_IDS = ADMIN_IDS_STR.split(",").map((s: string) => s.trim()).filter(Boolean);
+    const isAdmin = ALLOWED_ADMIN_IDS.length === 0 || ALLOWED_ADMIN_IDS.includes(String(user.id));
+
     const kb = new InlineKeyboard()
         .webApp("📊 ILOVAN-ni ochish", `${MINI_APP_URL}?user_id=${user.id}`);
+
+    if (isAdmin) {
+        const adminUrl = MINI_APP_URL.endsWith("/") ? `${MINI_APP_URL}admin.html` : `${MINI_APP_URL}/admin.html`;
+        kb.row().webApp("⚙️ Admin Panel", `${adminUrl}?user_id=${user.id}`);
+    }
 
     await ctx.reply(
         `👋 Salom, <b>${user.first_name || "Do'stim"}</b>!\n\n` +
