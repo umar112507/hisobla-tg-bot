@@ -110,6 +110,7 @@ async function loadSummary(isSilent = false) {
 
         const pBtn = document.getElementById("headerPremiumBtn");
         const pExp = document.getElementById("premiumExpiryText");
+        const pLimit = document.getElementById("userLimitText");
 
         if (data.is_premium) {
             pBtn.className = "header-premium-btn pro-active-badge";
@@ -123,13 +124,24 @@ async function loadSummary(isSilent = false) {
                 pExp.textContent = "· PRO active";
                 pExp.classList.remove("hidden");
             }
+            if (pLimit) pLimit.classList.add("hidden");
         } else {
             if (liveTickerTimer) clearInterval(liveTickerTimer);
             pBtn.className = "header-premium-btn pro-get-btn";
             pBtn.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> <span>PRO 'ga o'tish</span>`;
             pExp.classList.add("hidden");
+
+            // Display free limit
+            if (pLimit) {
+                const used = data.usage_count || 0;
+                const total = data.weekly_limit || 10;
+                const rem = Math.max(0, total - used);
+                pLimit.textContent = `· Limit: ${rem}/${total} ta`;
+                pLimit.classList.remove("hidden");
+            }
         }
 
+        updateModalProfileData(data);
         renderCharts(data.categories || []);
     } catch (e) {
         if (!isSilent) console.error("Summary load failed:", e);
@@ -569,8 +581,95 @@ async function activateCoupon() {
 }
 
 function openPremiumTab() {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
-    const premiumTab = document.getElementById("tab-premium");
-    if (premiumTab) premiumTab.classList.add("active");
+    openPremiumModal();
+}
+
+// ─── Profile & Premium Modals ─────────────────────────────────
+function openProfileModal() {
+    const modal = document.getElementById("profileModal");
+    if (modal) modal.classList.remove("hidden");
+}
+
+function closeProfileModal(e) {
+    if (e && e.target && e.target.id !== "profileModal" && !e.target.classList.contains("modal-close-btn")) return;
+    const modal = document.getElementById("profileModal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function openPremiumModal() {
+    const modal = document.getElementById("premiumModal");
+    if (modal) modal.classList.remove("hidden");
+}
+
+function closePremiumModal(e) {
+    if (e && e.target && e.target.id !== "premiumModal" && !e.target.classList.contains("modal-close-btn")) return;
+    const modal = document.getElementById("premiumModal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function updateModalProfileData(data) {
+    if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+        const u = window.Telegram.WebApp.initDataUnsafe.user;
+        const name = [u.first_name, u.last_name].filter(Boolean).join(" ");
+        const nameEl = document.getElementById("modalUserName");
+        const userEl = document.getElementById("modalUserUsername");
+        const idEl = document.getElementById("modalUserId");
+        const avatarEl = document.getElementById("modalUserAvatar");
+
+        if (nameEl) nameEl.textContent = name || "User";
+        if (userEl) userEl.textContent = u.username ? `@${u.username}` : "";
+        if (idEl) idEl.textContent = `ID: ${u.id}`;
+        if (avatarEl && u.photo_url) avatarEl.src = u.photo_url;
+    }
+
+    const badge = document.getElementById("modalStatusBadge");
+    if (badge) {
+        if (data.is_premium) {
+            badge.textContent = "PRO FAOL";
+            badge.className = "profile-status-badge pro";
+        } else {
+            badge.textContent = "BEPUL";
+            badge.className = "profile-status-badge free";
+        }
+    }
+
+    // Usage Progress
+    const used = data.usage_count || 0;
+    const total = data.weekly_limit || 10;
+    const pct = Math.min(100, Math.round((used / total) * 100));
+
+    const countTxt = document.getElementById("modalUsageCountText");
+    const fillEl = document.getElementById("modalUsageBarFill");
+    if (countTxt) countTxt.textContent = data.is_premium ? "Cheksiz (PRO ✨)" : `${used} / ${total} ta`;
+    if (fillEl) fillEl.style.width = data.is_premium ? "100%" : `${pct}%`;
+
+    // Render Premium History Timeline
+    const historyList = document.getElementById("modalPremiumHistoryList");
+    if (historyList) {
+        const history = data.premium_history || [];
+        if (history.length === 0) {
+            historyList.innerHTML = `<div class="empty-state"><div class="empty-state-text">Hali xaridlar mavjud emas</div></div>`;
+        } else {
+            let html = "";
+            history.forEach(item => {
+                const isAct = new Date(item.expires_at) > new Date();
+                const planName = item.plan === "10_seconds_test" ? "⚡ 10 Sekundlik Sinov" : item.plan;
+                const dt = new Date(item.created_at || Date.now()).toLocaleDateString("uz-UZ");
+                const expDt = new Date(item.expires_at).toLocaleDateString("uz-UZ");
+
+                html += `
+                    <div class="history-item">
+                        <div class="history-item-left">
+                            <div class="history-item-plan">${planName}</div>
+                            <div class="history-item-date">Olingan: ${dt} · Tugashi: ${expDt}</div>
+                        </div>
+                        <div class="history-item-badge ${isAct ? 'active' : 'expired'}">
+                            ${isAct ? 'Faol' : 'Tugagan'}
+                        </div>
+                    </div>
+                `;
+            });
+            historyList.innerHTML = html;
+        }
+    }
 }

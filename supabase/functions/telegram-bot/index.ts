@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
                 .select("*")
                 .eq("user_id", userId);
 
-            const { data: userData } = await supabase.from("users").select("is_premium, premium_expires_at").eq("user_id", userId).single();
+            const { data: userData } = await supabase.from("users").select("is_premium, premium_expires_at, usage_count").eq("user_id", userId).single();
 
             let isPremium = userData?.is_premium || false;
             let premiumExpiresAt = userData?.premium_expires_at || null;
@@ -197,6 +197,18 @@ Deno.serve(async (req) => {
                     isPremium = false;
                     await supabase.from("users").update({ is_premium: false }).eq("user_id", userId);
                 }
+            }
+
+            // Fetch premium history if available
+            let premiumHistory = [];
+            try {
+                const { data: hist } = await supabase.from("premium_history")
+                    .select("*")
+                    .eq("user_id", userId)
+                    .order("created_at", { ascending: false });
+                if (hist) premiumHistory = hist;
+            } catch (e) {
+                // Ignore if table does not exist yet
             }
 
             const transactions = data || [];
@@ -227,6 +239,9 @@ Deno.serve(async (req) => {
                     categories,
                     is_premium: isPremium,
                     premium_expires_at: premiumExpiresAt,
+                    usage_count: userData?.usage_count || 0,
+                    weekly_limit: 10,
+                    premium_history: premiumHistory,
                 }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
@@ -475,6 +490,17 @@ Deno.serve(async (req) => {
                 usage_count: 0,
                 premium_expires_at: newExpiry.toISOString()
             }).eq("user_id", user_id);
+
+            try {
+                await supabase.from("premium_history").insert({
+                    user_id: user_id,
+                    plan: "10_seconds_test",
+                    days: 0,
+                    expires_at: newExpiry.toISOString(),
+                });
+            } catch (e) {
+                // Ignore if history table not created yet
+            }
 
             return jsonRes({ success: true, seconds, expires_at: newExpiry.toISOString() });
         } catch (e) {

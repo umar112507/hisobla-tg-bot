@@ -106,7 +106,7 @@ export async function checkAndIncrementUsage(userId: number): Promise<boolean> {
     try {
         const { data: user, error } = await supabase
             .from("users")
-            .select("usage_count, usage_reset_date, is_premium")
+            .select("usage_count, usage_reset_date, is_premium, premium_expires_at")
             .eq("user_id", userId)
             .single();
 
@@ -115,7 +115,15 @@ export async function checkAndIncrementUsage(userId: number): Promise<boolean> {
             return true;
         }
 
-        if (user.is_premium) return true;
+        let isPremium = user.is_premium || false;
+        if (isPremium && user.premium_expires_at) {
+            if (new Date(user.premium_expires_at) <= new Date()) {
+                isPremium = false;
+                await supabase.from("users").update({ is_premium: false }).eq("user_id", userId);
+            }
+        }
+
+        if (isPremium) return true;
 
         const now = new Date();
         const resetDate = user.usage_reset_date ? new Date(user.usage_reset_date) : now;
