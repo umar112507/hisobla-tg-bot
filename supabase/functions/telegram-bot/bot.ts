@@ -80,9 +80,10 @@ bot.on("message:text", async (ctx) => {
     // Bepul xabarlar limitini tekshirish
     const canUse = await checkAndIncrementUsage(user.id);
     if (!canUse) {
-        await ctx.reply("⚠️ <b>Haftalik limit tugadi!</b>\n\nSiz haftalik bepul beriladigan 10 ta xabar limitidan foydalanib bo'ldingiz.\n\nCheksiz yozish, ovozli xabarlar va eksklyuziv imkoniyatlardan foydalanish uchun <b>Premium</b> xarid qiling! (Tez orada inpay.uz orqali to'lov qo'shiladi)", {
+        const premiumUrl = `${MINI_APP_URL}?user_id=${user.id}#tab-premium`;
+        await ctx.reply("⚠️ <b>Haftalik limit tugadi!</b>\n\nSiz haftalik bepul beriladigan 10 ta xabar limitidan foydalanib bo'ldingiz.\n\nCheksiz yozish, ovozli xabarlar va eksklyuziv imkoniyatlardan foydalanish uchun <b>Premium</b> xarid qiling!", {
             parse_mode: "HTML",
-            reply_markup: new InlineKeyboard().url("👑 Premium", "https://t.me/umar112507")
+            reply_markup: new InlineKeyboard().webApp("👑 Premium Xarid Qilish", premiumUrl)
         });
         return;
     }

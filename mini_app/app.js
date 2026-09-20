@@ -40,6 +40,10 @@ document.addEventListener("DOMContentLoaded", () => {
     setupTabs();
     setupFilters();
     setupPureEventSync();
+
+    if (window.location.hash === "#tab-premium") {
+        openPremiumTab();
+    }
 });
 
 // ─── Pure Event-Driven Sync (Zero Polling Timers) ─────────────
