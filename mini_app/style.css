@@ -943,3 +943,61 @@ body::before {
   background: linear-gradient(90deg, #5e35b1, #b39ddb);
   color: #fff;
 }
+
+/* ─── Coupon Activation Card ────────────────────────────────── */
+.coupon-activate-card {
+  padding: 18px 20px;
+  margin-bottom: 20px;
+}
+
+.coupon-header {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffb300;
+  margin-bottom: 12px;
+}
+
+.coupon-input-wrap {
+  display: flex;
+  gap: 10px;
+}
+
+.coupon-input-wrap input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  padding: 10px 16px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 1px;
+  outline: none;
+  transition: var(--transition);
+}
+
+.coupon-input-wrap input:focus {
+  border-color: #ffb300;
+  box-shadow: 0 0 0 3px rgba(255, 179, 0, 0.15);
+}
+
+.coupon-activate-btn {
+  background: linear-gradient(90deg, #ffa000, #ffca28);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 10px 18px;
+  color: #fff;
+  font-weight: 700;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.coupon-activate-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 160, 0, 0.3);
+}

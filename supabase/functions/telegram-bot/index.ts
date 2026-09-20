@@ -3,7 +3,11 @@ import { bot } from "./bot.ts";
 import { supabase } from "./db.ts";
 
 const handleUpdate = webhookCallback(bot, "std/http");
-const ADMIN_SECRET = "hisobla_admin_2024";
+// @ts-ignore Deno global
+const ADMIN_SECRET = (globalThis as any).Deno?.env.get("ADMIN_SECRET") || "hisobla_admin_2024";
+// @ts-ignore Deno global
+const ADMIN_IDS_STR = (globalThis as any).Deno?.env.get("ADMIN_IDS") || ""; // e.g. "12345678,98765432"
+const ALLOWED_ADMIN_IDS = ADMIN_IDS_STR.split(",").map((s: string) => s.trim()).filter(Boolean);
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -20,15 +24,21 @@ function jsonRes(data: any, status = 200) {
 
 function checkAdmin(req: Request, url: URL): boolean {
     const secret = url.searchParams.get("secret");
-    if (secret === ADMIN_SECRET) return true;
-    try {
-        const body = req.headers.get("content-type")?.includes("json") ? null : null;
-    } catch { }
-    return false;
+    const userId = url.searchParams.get("user_id");
+
+    if (secret !== ADMIN_SECRET) return false;
+    if (ALLOWED_ADMIN_IDS.length > 0 && userId) {
+        if (!ALLOWED_ADMIN_IDS.includes(userId)) return false;
+    }
+    return true;
 }
 
 function checkAdminPost(body: any): boolean {
-    return body?.secret === ADMIN_SECRET;
+    if (!body || body.secret !== ADMIN_SECRET) return false;
+    if (ALLOWED_ADMIN_IDS.length > 0 && body.user_id) {
+        if (!ALLOWED_ADMIN_IDS.includes(String(body.user_id))) return false;
+    }
+    return true;
 }
 
 Deno.serve(async (req) => {

@@ -1,15 +1,31 @@
 // ─── Config ───────────────────────────────────────────────────
 const API_BASE = "https://dyqmawwyooeqadibnpqc.supabase.co/functions/v1/telegram-bot";
-const ADMIN_SECRET = "hisobla_admin_2024"; // Simple admin key
+const tg = window.Telegram?.WebApp;
+let ADMIN_SECRET = localStorage.getItem("admin_secret") || "";
+
+// Check URL params for secret or user_id
+const params = new URLSearchParams(window.location.search);
+if (params.get("secret")) {
+    ADMIN_SECRET = params.get("secret");
+    localStorage.setItem("admin_secret", ADMIN_SECRET);
+}
+const TG_USER_ID = tg?.initDataUnsafe?.user?.id || params.get("user_id") || "";
 
 let allUsers = [];
 let allCoupons = [];
 
-document.addEventListener("DOMContentLoaded", () => {
-    loadStats();
-    loadUsers();
-    loadCoupons();
+document.addEventListener("DOMContentLoaded", async () => {
     setupTabs();
+    setupAuthListeners();
+
+    if (ADMIN_SECRET) {
+        const ok = await verifyAndLoad(ADMIN_SECRET);
+        if (!ok) {
+            showAuthOverlay();
+        }
+    } else {
+        showAuthOverlay();
+    }
 
     document.getElementById("userSearch").addEventListener("input", (e) => {
         filterUsers(e.target.value);
@@ -18,8 +34,76 @@ document.addEventListener("DOMContentLoaded", () => {
     // Set default expiry to 30 days from now
     const expDate = new Date();
     expDate.setDate(expDate.getDate() + 30);
-    document.getElementById("couponExpiry").value = expDate.toISOString().split("T")[0];
+    const expiryEl = document.getElementById("couponExpiry");
+    if (expiryEl) expiryEl.value = expDate.toISOString().split("T")[0];
 });
+
+function setupAuthListeners() {
+    const input = document.getElementById("secretInput");
+    if (input) {
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") authenticateAdmin();
+        });
+    }
+}
+
+function showAuthOverlay() {
+    document.getElementById("authOverlay")?.classList.remove("hidden");
+}
+
+function hideAuthOverlay() {
+    document.getElementById("authOverlay")?.classList.add("hidden");
+}
+
+async function authenticateAdmin() {
+    const secret = document.getElementById("secretInput").value.trim();
+    const errEl = document.getElementById("authError");
+    errEl.textContent = "";
+
+    if (!secret) {
+        errEl.textContent = "❌ Maxfiy parolni kiriting!";
+        return;
+    }
+
+    const ok = await verifyAndLoad(secret);
+    if (ok) {
+        ADMIN_SECRET = secret;
+        localStorage.setItem("admin_secret", secret);
+        hideAuthOverlay();
+    } else {
+        errEl.textContent = "❌ Noto'g'ri maxfiy parol yoki ruxsat yo'q!";
+    }
+}
+
+function logoutAdmin() {
+    localStorage.removeItem("admin_secret");
+    ADMIN_SECRET = "";
+    showAuthOverlay();
+}
+
+async function verifyAndLoad(secret) {
+    try {
+        let url = `${API_BASE}/api/admin/stats?secret=${encodeURIComponent(secret)}`;
+        if (TG_USER_ID) url += `&user_id=${TG_USER_ID}`;
+
+        const res = await fetch(url);
+        if (!res.ok) return false;
+
+        const data = await res.json();
+        document.getElementById("statUsers").textContent = data.total_users || 0;
+        document.getElementById("statPremium").textContent = data.premium_users || 0;
+        document.getElementById("statTransactions").textContent = data.total_transactions || 0;
+        document.getElementById("statCoupons").textContent = data.active_coupons || 0;
+
+        hideAuthOverlay();
+        loadUsers();
+        loadCoupons();
+        return true;
+    } catch (e) {
+        console.error("Auth verify failed:", e);
+        return false;
+    }
+}
 
 // ─── Tabs ─────────────────────────────────────────────────────
 function setupTabs() {
@@ -35,8 +119,11 @@ function setupTabs() {
 
 // ─── Load Dashboard Stats ─────────────────────────────────────
 async function loadStats() {
+    if (!ADMIN_SECRET) return;
     try {
-        const res = await fetch(`${API_BASE}/api/admin/stats?secret=${ADMIN_SECRET}`);
+        let url = `${API_BASE}/api/admin/stats?secret=${encodeURIComponent(ADMIN_SECRET)}`;
+        if (TG_USER_ID) url += `&user_id=${TG_USER_ID}`;
+        const res = await fetch(url);
         const data = await res.json();
         document.getElementById("statUsers").textContent = data.total_users || 0;
         document.getElementById("statPremium").textContent = data.premium_users || 0;
@@ -49,8 +136,11 @@ async function loadStats() {
 
 // ─── Load Users ───────────────────────────────────────────────
 async function loadUsers() {
+    if (!ADMIN_SECRET) return;
     try {
-        const res = await fetch(`${API_BASE}/api/admin/users?secret=${ADMIN_SECRET}`);
+        let url = `${API_BASE}/api/admin/users?secret=${encodeURIComponent(ADMIN_SECRET)}`;
+        if (TG_USER_ID) url += `&user_id=${TG_USER_ID}`;
+        const res = await fetch(url);
         allUsers = await res.json();
         renderUsers(allUsers);
     } catch (e) {
@@ -145,8 +235,11 @@ async function resetUsage(userId) {
 
 // ─── Load Coupons ─────────────────────────────────────────────
 async function loadCoupons() {
+    if (!ADMIN_SECRET) return;
     try {
-        const res = await fetch(`${API_BASE}/api/admin/coupons?secret=${ADMIN_SECRET}`);
+        let url = `${API_BASE}/api/admin/coupons?secret=${encodeURIComponent(ADMIN_SECRET)}`;
+        if (TG_USER_ID) url += `&user_id=${TG_USER_ID}`;
+        const res = await fetch(url);
         allCoupons = await res.json();
         renderCoupons(allCoupons);
     } catch (e) {

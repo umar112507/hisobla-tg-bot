@@ -13,6 +13,20 @@
 </head>
 
 <body>
+    <!-- Auth Secret Modal (Shown when not authenticated) -->
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-card glass-card">
+            <div class="auth-icon">🔒</div>
+            <h2>Admin Panelga Kirish</h2>
+            <p>Admin huquqini tasdiqlash uchun Maxfiy Parol (Secret Key)ni kiriting:</p>
+            <div class="auth-form">
+                <input type="password" id="secretInput" placeholder="Maxfiy parolni kiriting..." />
+                <button class="auth-btn" onclick="authenticateAdmin()">Kirish 🚀</button>
+            </div>
+            <div class="auth-error" id="authError"></div>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="admin-header">
         <div class="admin-header-content">
@@ -20,7 +34,10 @@
                 <span class="admin-logo">⚙️</span>
                 <span class="admin-title">Hisobla Admin</span>
             </div>
-            <div class="admin-user" id="adminUser">Admin</div>
+            <div class="admin-user-wrap">
+                <div class="admin-user" id="adminUser">Admin</div>
+                <button class="logout-btn" onclick="logoutAdmin()" title="Chiqish">🚪</button>
+            </div>
         </div>
     </header>
 

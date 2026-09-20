@@ -442,3 +442,37 @@ function showEmptyAll(msg) {
 function buyPremium(planId) {
     showToast("💳 To'lov xizmati (inpay.uz) tez orada ulanadi! 🔥");
 }
+
+async function activateCoupon() {
+    const input = document.getElementById("userCouponCode");
+    const code = input ? input.value.trim().toUpperCase() : "";
+
+    if (!code) {
+        showToast("❌ Kupon kodini kiriting!");
+        return;
+    }
+    if (!USER_ID) {
+        showToast("❌ Telegram ID topilmadi");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/api/coupon/activate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code, user_id: USER_ID }),
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            showToast("🎉 Premium muvaffaqiyatli faollashtirildi! 👑");
+            if (input) input.value = "";
+            loadSummary(false);
+        } else {
+            showToast(`❌ ${data.error || "Kupon nofaol yoki noto'g'ri"}`);
+        }
+    } catch (e) {
+        console.error("Coupon activate error:", e);
+        showToast("❌ Xatolik yuz berdi");
+    }
+}
