@@ -153,3 +153,73 @@ export async function checkAndIncrementUsage(userId: number): Promise<boolean> {
         return true;
     }
 }
+
+export async function saveChatMessage(userId: number, role: "user" | "assistant", content: string) {
+    try {
+        await supabase.from("chat_history").insert({
+            user_id: userId,
+            role,
+            content,
+        });
+    } catch (e) {
+        // Table fallback
+    }
+}
+
+export async function getChatHistory(userId: number, limit = 15) {
+    try {
+        const { data } = await supabase
+            .from("chat_history")
+            .select("role, content, created_at")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(limit);
+
+        return (data || []).reverse();
+    } catch (e) {
+        return [];
+    }
+}
+
+export async function updateLastDebtPerson(userId: number, personName: string) {
+    try {
+        const { data: debts } = await supabase
+            .from("debts")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+        if (debts && debts.length > 0) {
+            const lastDebt = debts[0];
+            const oldPerson = lastDebt.person_name || "Noma'lum";
+
+            await supabase
+                .from("debts")
+                .update({ person_name: personName })
+                .eq("id", lastDebt.id);
+
+            // Also update matching transaction description if available
+            const { data: txs } = await supabase
+                .from("transactions")
+                .select("*")
+                .eq("user_id", userId)
+                .order("created_at", { ascending: false })
+                .limit(2);
+
+            if (txs) {
+                for (const tx of txs) {
+                    if (tx.description && (tx.description.includes("Noma'lum") || tx.description.includes(oldPerson) || tx.description.includes("qarz") || tx.description.includes("Qarz"))) {
+                        const newDesc = `${personName} ${lastDebt.direction === "gave" ? "ga qarz berildi" : "dan qarz olindi"}`;
+                        await supabase.from("transactions").update({ description: newDesc, category: `${personName} (Qarz)` }).eq("id", tx.id);
+                        break;
+                    }
+                }
+            }
+            return { ...lastDebt, person_name: personName };
+        }
+    } catch (e) {
+        console.error("Error updating last debt person:", e);
+    }
+    return null;
+}

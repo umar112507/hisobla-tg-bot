@@ -1,6 +1,6 @@
 import { webhookCallback } from "https://esm.sh/grammy@1.27.0";
 import { bot } from "./bot.ts";
-import { supabase, ensureUser, addTransaction, addDebt, getSummary, checkAndIncrementUsage } from "./db.ts";
+import { supabase, ensureUser, addTransaction, addDebt, getSummary, checkAndIncrementUsage, saveChatMessage, getChatHistory, updateLastDebtPerson } from "./db.ts";
 import { parseIntent, categorizeTransaction } from "./ai.ts";
 
 const handleUpdate = webhookCallback(bot, "std/http");
@@ -130,27 +130,46 @@ Deno.serve(async (req) => {
                 return jsonRes({ error: "Haftalik limit tugadi!", limit_reached: true }, 403);
             }
 
+            await saveChatMessage(user_id, "user", text);
+            const chatHistory = await getChatHistory(user_id, 15);
             const summary = await getSummary(user_id);
-            const parsed = await parseIntent(text, summary);
+            const parsed = await parseIntent(text, summary, chatHistory);
 
-            if (parsed.intent === "expense" && parsed.amount) {
+            if (parsed.intent === "update_last_debt" && parsed.person) {
+                const updated = await updateLastDebtPerson(user_id, parsed.person);
+                const msg = updated
+                    ? `✅ Qarz egasi "${parsed.person}" deb saqlandi! (${Number(updated.amount).toLocaleString()} so'm)`
+                    : `✅ Qarz egasi "${parsed.person}" deb saqlandi!`;
+                await saveChatMessage(user_id, "assistant", msg);
+                return jsonRes({ success: true, intent: "update_last_debt", message: msg });
+            } else if (parsed.intent === "expense" && parsed.amount) {
                 const category = await categorizeTransaction(parsed.description || text, "expense");
                 await addTransaction(user_id, "expense", parsed.amount, category, parsed.description || text);
-                return jsonRes({ success: true, intent: "expense", message: `💸 ${category}: ${Number(parsed.amount).toLocaleString()} so'm qo'shildi` });
+                const msg = `💸 ${category}: ${Number(parsed.amount).toLocaleString()} so'm qo'shildi`;
+                await saveChatMessage(user_id, "assistant", msg);
+                return jsonRes({ success: true, intent: "expense", message: msg });
             } else if (parsed.intent === "income" && parsed.amount) {
                 const category = await categorizeTransaction(parsed.description || text, "income");
                 await addTransaction(user_id, "income", parsed.amount, category, parsed.description || text);
-                return jsonRes({ success: true, intent: "income", message: `💰 ${category}: ${Number(parsed.amount).toLocaleString()} so'm qo'shildi` });
+                const msg = `💰 ${category}: ${Number(parsed.amount).toLocaleString()} so'm qo'shildi`;
+                await saveChatMessage(user_id, "assistant", msg);
+                return jsonRes({ success: true, intent: "income", message: msg });
             } else if (parsed.intent === "debt_gave" && parsed.person && parsed.amount) {
                 await addDebt(user_id, "gave", parsed.person, Number(parsed.amount), text, parsed.due_date);
-                await addTransaction(user_id, "expense", Number(parsed.amount), "Qarz berish", `${parsed.person} ga qarz berildi`);
-                return jsonRes({ success: true, intent: "debt_gave", message: `📤 ${parsed.person} ga ${Number(parsed.amount).toLocaleString()} so'm qarz saqlandi` });
+                await addTransaction(user_id, "expense", Number(parsed.amount), `${parsed.person} (Qarz)`, `${parsed.person} ga qarz berildi`);
+                const msg = `📤 ${parsed.person} ga ${Number(parsed.amount).toLocaleString()} so'm qarz saqlandi`;
+                await saveChatMessage(user_id, "assistant", msg);
+                return jsonRes({ success: true, intent: "debt_gave", message: msg });
             } else if (parsed.intent === "debt_received" && parsed.person && parsed.amount) {
                 await addDebt(user_id, "received", parsed.person, Number(parsed.amount), text, parsed.due_date);
-                await addTransaction(user_id, "income", Number(parsed.amount), "Qarz olish", `${parsed.person} dan qarz olindi`);
-                return jsonRes({ success: true, intent: "debt_received", message: `📥 ${parsed.person} dan ${Number(parsed.amount).toLocaleString()} so'm qarz saqlandi` });
+                await addTransaction(user_id, "income", Number(parsed.amount), `${parsed.person} (Qarz)`, `${parsed.person} dan qarz olindi`);
+                const msg = `📥 ${parsed.person} dan ${Number(parsed.amount).toLocaleString()} so'm qarz saqlandi`;
+                await saveChatMessage(user_id, "assistant", msg);
+                return jsonRes({ success: true, intent: "debt_received", message: msg });
             } else {
-                return jsonRes({ success: true, intent: "ai_reply", message: parsed.reply || "🤖 Tushundim!" });
+                const msg = parsed.reply || "🤖 Tushundim!";
+                await saveChatMessage(user_id, "assistant", msg);
+                return jsonRes({ success: true, intent: "ai_reply", message: msg });
             }
         } catch (e: any) {
             console.error("Process intent API error:", e);

@@ -1,5 +1,5 @@
 import { Bot, InlineKeyboard } from "https://esm.sh/grammy@1.27.0";
-import { ensureUser, addTransaction, addDebt, getDebts, getSummary, checkAndIncrementUsage } from "./db.ts";
+import { ensureUser, addTransaction, addDebt, getDebts, getSummary, checkAndIncrementUsage, saveChatMessage, getChatHistory, updateLastDebtPerson } from "./db.ts";
 import { categorizeTransaction, parseIntent, transcribeAudio } from "./ai.ts";
 
 const BOT_TOKEN = Deno.env.get("BOT_TOKEN") || "";
@@ -130,29 +130,59 @@ bot.on("message:voice", async (ctx) => {
 });
 
 async function processIntent(ctx: any, user: any, text: string) {
+    await saveChatMessage(user.id, "user", text);
+    const chatHistory = await getChatHistory(user.id, 15);
     const summary = await getSummary(user.id);
-    const parsed = await parseIntent(text, summary);
+    const parsed = await parseIntent(text, summary, chatHistory);
 
-    if (parsed.intent === "expense" && parsed.amount) {
+    let replyMsg = "";
+
+    if (parsed.intent === "update_last_debt" && parsed.person) {
+        const updated = await updateLastDebtPerson(user.id, parsed.person);
+        if (updated) {
+            replyMsg = `✅ Qarz shaxsi <b>${parsed.person}</b> deb muvaffaqiyatli saqlandi! (${Number(updated.amount).toLocaleString()} so'm)`;
+        } else {
+            replyMsg = `✅ Shaxs nomi <b>${parsed.person}</b> ga almashtirildi!`;
+        }
+        await ctx.reply(replyMsg, { parse_mode: "HTML" });
+    } else if (parsed.intent === "expense" && parsed.amount) {
         await handleExpense(ctx, `${parsed.amount} ${parsed.description || text}`);
+        return;
     } else if (parsed.intent === "income" && parsed.amount) {
         await handleIncome(ctx, `${parsed.amount} ${parsed.description || text}`);
+        return;
     } else if (parsed.intent === "debt_gave" && parsed.person && parsed.amount) {
         await addDebt(user.id, "gave", parsed.person, Number(parsed.amount), text, parsed.due_date);
-        await addTransaction(user.id, "expense", Number(parsed.amount), "Qarz berish", `${parsed.person} ga qarz berildi`);
-        await ctx.reply(`📤 <b>Qarz berganingiz saqlandi!</b>\n\n👤 <b>Kim:</b> ${parsed.person}\n💵 <b>Miqdor:</b> ${Number(parsed.amount).toLocaleString()} so'm`, { parse_mode: "HTML" });
+        await addTransaction(user.id, "expense", Number(parsed.amount), `${parsed.person} (Qarz)`, `${parsed.person} ga qarz berildi`);
+        replyMsg = `📤 <b>Qarz berganingiz saqlandi!</b>\n\n👤 <b>Kim:</b> ${parsed.person}\n💵 <b>Miqdor:</b> ${Number(parsed.amount).toLocaleString()} so'm`;
+        if (parsed.person === "Noma'lum") {
+            replyMsg += `\n\n❓ <i>Kimga qarz berganingizni yozing (masalan: "Onamga" yoki "Aliga")</i>`;
+        }
+        await ctx.reply(replyMsg, { parse_mode: "HTML" });
     } else if (parsed.intent === "debt_received" && parsed.person && parsed.amount) {
         await addDebt(user.id, "received", parsed.person, Number(parsed.amount), text, parsed.due_date);
-        await addTransaction(user.id, "income", Number(parsed.amount), "Qarz olish", `${parsed.person} dan qarz olindi`);
-        await ctx.reply(`📥 <b>Qarz olganingiz saqlandi!</b>\n\n👤 <b>Kim:</b> ${parsed.person}\n💵 <b>Miqdor:</b> ${Number(parsed.amount).toLocaleString()} so'm`, { parse_mode: "HTML" });
+        await addTransaction(user.id, "income", Number(parsed.amount), `${parsed.person} (Qarz)`, `${parsed.person} dan qarz olindi`);
+        replyMsg = `📥 <b>Qarz olganingiz saqlandi!</b>\n\n👤 <b>Kim:</b> ${parsed.person}\n💵 <b>Miqdor:</b> ${Number(parsed.amount).toLocaleString()} so'm`;
+        if (parsed.person === "Noma'lum") {
+            replyMsg += `\n\n❓ <i>Kimdan qarz olganingizni yozing (masalan: "Onamdan" yoki "Alidan")</i>`;
+        }
+        await ctx.reply(replyMsg, { parse_mode: "HTML" });
     } else if (parsed.intent === "report") {
         await handleReport(ctx);
+        return;
     } else if (parsed.intent === "debts_list") {
         await handleDebtsList(ctx);
+        return;
     } else if (parsed.reply) {
-        await ctx.reply(parsed.reply, { parse_mode: "HTML" });
+        replyMsg = parsed.reply;
+        await ctx.reply(replyMsg, { parse_mode: "HTML" });
     } else {
-        await ctx.reply("🤖 Tushundim! Xarajat yoki daromadingizni kiritishingiz mumkin.");
+        replyMsg = "🤖 Tushundim! Xarajat yoki daromadingizni kiritishingiz mumkin.";
+        await ctx.reply(replyMsg);
+    }
+
+    if (replyMsg) {
+        await saveChatMessage(user.id, "assistant", replyMsg);
     }
 }
 

@@ -63,38 +63,50 @@ Faqat mos kategoriya nomini qaytaring. JSON formatda: {"category": "Kategoriya"}
     return "Boshqa";
 }
 
-export async function parseIntent(text: string, summaryContext?: any) {
+export async function parseIntent(text: string, summaryContext?: any, chatHistory: any[] = []) {
     const today = new Date().toISOString().split("T")[0];
 
-    const prompt = `Siz "Hisobla" moliyaviy AI yordamchisiz. Bugungi sana: ${today}.
-Matnni (yoki ovozdan o'girilgan matnni) chuqur tahlil qiling va qarz, xarajat yoki daromad ekanligini ajrating.
+    let historyText = "";
+    if (chatHistory && chatHistory.length > 0) {
+        historyText = "\nSUHBAT TARIXI (Oxirgi suhbatlar):\n" + chatHistory.slice(-15).map(m => `${m.role === "user" ? "Foydalanuvchi" : "AI"}: ${m.content}`).join("\n") + "\n";
+    }
 
-IMLO XATOLARI VA SHEVA SHAKLLARI (IMPORTANT):
+    const prompt = `Siz "Hisobla" moliyaviy AI yordamchisiz. Bugungi sana: ${today}.
+${historyText}
+Hozirgi foydalanuvchi xabari: "${text}"
+
+Matnni va suhbat tarixini (context) chuqur tahlil qilib, intentni ajrating.
+
+MOLIYAVIY SUHBAT HOTIRASI (CONTEXT):
+- Agar oldingi suhbatda qarz berilgan/olingan bo'lsa va unda shaxs "Noma'lum" bo'lib qolgan bo'lsa (yoki AI kimga qarz berilganini so'ragan bo'lsa) va yangi xabarda foydalanuvchi faqat ism aytgan bo me'yoriy javob bergan bo'lsa (masalan: "Onamga", "Aliga", "Sardorga", "Vali" va h.k.), intent: "update_last_debt" deb javob bering!
+  JSON: {"intent": "update_last_debt", "person": "Onam"}
+
+IMLO XATOLARI VA SHEVA SHAKLLARI:
 1. Sonlar va birliklar:
    - "min", "ming", "k", "m" -> 1 000 (masalan: "10 min", "10 ming", "10k" -> 10000)
    - "mln", "million", "milon", "lem" -> 1 000 000 (masalan: "2 mln", "2 million" -> 2000000)
 2. Daromad va Oylik shakllari:
-   - "oyli", "oylik", "oylih", "maosh", "zarplata", "zarplat", "avans", "stipendiya" -> Daromad
+   - "oyli", "oylik", "oylih", "maosh", "zarplata", "avans", "stipendiya" -> Daromad
 3. Xarajat va Tushlik/Transport shakllari:
    - "tushli", "tushlik", "abed", "abet", "obed", "ovqat", "somsa", "osh" -> Xarajat (tushlik/ovqat)
    - "yolkira", "yo'l kira", "yol haqqi", "yo'l haqqi", "taksi", "taxi", "benzin" -> Xarajat (taksi/transport)
 4. Qarz harakatlari:
-   - "qarz berdim", "berdim", "berudim", "berib turdim", "oldiga berdim" -> intent: "debt_gave"
-   - "qarz oldim", "oldim", "oluvdim", "olganim", "menga berdi" -> intent: "debt_received"
+   - "qarz berdim", "berdim", "berudim", "berib turdim", "oldiga berdim" -> intent: "debt_gave" (Agar ism aytilmagan bo'lsa person: "Noma'lum")
+   - "qarz oldim", "oldim", "oluvdim", "olganim", "menga berdi" -> intent: "debt_received" (Agar ism aytilmagan bo'lsa person: "Noma'lum")
 
 QARZ QOIDALARI:
-- QARZ BERILDI ("debt_gave"): Men kimgadir qarz bergan bo'lsam (masalan: "Ali ga 500 min qarz berdim", "Sardor 100k oldi", "Javohirga 200 min berildi") -> intent: "debt_gave"
-- QARZ OLINDI ("debt_received"): Men kimdandir qarz olgan bo'lsam (masalan: "Validan 200 min qarz oldim", "Sobir menga 500 min qarz berdi") -> intent: "debt_received"
+- QARZ BERILDI ("debt_gave"): Men kimgadir qarz bergan bo'lsam -> {"intent": "debt_gave", "person": "Ali", "amount": 100000, "due_date": "YYYY-MM-DD yoki null"}
+- QARZ OLINDI ("debt_received"): Men kimdandir qarz olgan bo'lsam -> {"intent": "debt_received", "person": "Vali", "amount": 200000, "due_date": "YYYY-MM-DD yoki null"}
+- QARZ SHAXSINI YANGILASH ("update_last_debt"): Agar foydalanuvchi oldingi "Noma'lum" qarzga ism aytayotgan bo'lsa -> {"intent": "update_last_debt", "person": "Onam"}
 
 MUDDAT (due_date):
 - Agar muddat aytilgan bo'lsa (masalan: "10 kunga", "oy oxirigacha", "15-oktyabrgacha"), uni YYYY-MM-DD formatida hisoblab chiqaring.
 - Aks holda null.
 
-Matn: "${text}"
-
 Faqat toza JSON qaytaring:
 - Qarz berildi: {"intent": "debt_gave", "person": "Ali", "amount": 500000, "due_date": "YYYY-MM-DD yoki null"}
 - Qarz olindi: {"intent": "debt_received", "person": "Vali", "amount": 200000, "due_date": "YYYY-MM-DD yoki null"}
+- Qarz shaxsini to'ldirish: {"intent": "update_last_debt", "person": "Onam"}
 - Daromad: {"intent": "income", "amount": 2000000, "description": "oylik"}
 - Xarajat: {"intent": "expense", "amount": 10000, "description": "taksi"}
 - Hisobot: {"intent": "report"}
