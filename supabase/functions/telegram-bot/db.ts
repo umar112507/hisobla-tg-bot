@@ -154,7 +154,18 @@ export async function checkAndIncrementUsage(userId: number): Promise<boolean> {
     }
 }
 
+const chatHistoryMemoryMap = new Map<number, Array<{ role: string; content: string }>>();
+
 export async function saveChatMessage(userId: number, role: "user" | "assistant", content: string) {
+    // 1. Dual cache: Always store in Edge Function memory map
+    if (!chatHistoryMemoryMap.has(userId)) {
+        chatHistoryMemoryMap.set(userId, []);
+    }
+    const memList = chatHistoryMemoryMap.get(userId)!;
+    memList.push({ role, content });
+    if (memList.length > 30) memList.shift();
+
+    // 2. Try inserting into Supabase DB table
     try {
         await supabase.from("chat_history").insert({
             user_id: userId,
@@ -162,11 +173,13 @@ export async function saveChatMessage(userId: number, role: "user" | "assistant"
             content,
         });
     } catch (e) {
-        // Table fallback
+        // DB table fallback
     }
 }
 
 export async function getChatHistory(userId: number, limit = 15) {
+    let history: Array<{ role: string; content: string }> = [];
+
     try {
         const { data } = await supabase
             .from("chat_history")
@@ -175,10 +188,19 @@ export async function getChatHistory(userId: number, limit = 15) {
             .order("created_at", { ascending: false })
             .limit(limit);
 
-        return (data || []).reverse();
+        if (data && data.length > 0) {
+            history = data.reverse().map(d => ({ role: d.role, content: d.content }));
+        }
     } catch (e) {
-        return [];
+        // Ignore DB error
     }
+
+    // Fallback to in-memory history if DB returned nothing
+    if (history.length === 0 && chatHistoryMemoryMap.has(userId)) {
+        history = chatHistoryMemoryMap.get(userId)!.slice(-limit);
+    }
+
+    return history;
 }
 
 export async function updateLastDebtPerson(userId: number, personName: string) {
@@ -199,7 +221,7 @@ export async function updateLastDebtPerson(userId: number, personName: string) {
                 .update({ person_name: personName })
                 .eq("id", lastDebt.id);
 
-            // Also update matching transaction description if available
+            // Also update matching transaction description
             const { data: txs } = await supabase
                 .from("transactions")
                 .select("*")
@@ -220,6 +242,39 @@ export async function updateLastDebtPerson(userId: number, personName: string) {
         }
     } catch (e) {
         console.error("Error updating last debt person:", e);
+    }
+    return null;
+}
+
+export async function checkAndResolveRecentDebtPerson(userId: number, text: string) {
+    try {
+        const { data: debts } = await supabase
+            .from("debts")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+        if (debts && debts.length > 0) {
+            const lastDebt = debts[0];
+            const isUnknown = !lastDebt.person_name || lastDebt.person_name === "Noma'lum";
+
+            // Check if last debt was created within last 24h
+            const debtTime = new Date(lastDebt.created_at || Date.now()).getTime();
+            const isRecent = (Date.now() - debtTime) < 24 * 3600 * 1000;
+
+            if (isUnknown && isRecent) {
+                let clean = text.trim();
+                // Strip common suffix endings like -ga, -gi, -dan, -ni
+                clean = clean.replace(/(?:ga|gi|dan|ni|da|mga|imga)$/i, "").trim();
+                if (clean.length > 0 && clean.length < 30) {
+                    clean = clean.charAt(0).toUpperCase() + clean.slice(1);
+                    return await updateLastDebtPerson(userId, clean);
+                }
+            }
+        }
+    } catch (e) {
+        console.error("checkAndResolveRecentDebtPerson error:", e);
     }
     return null;
 }

@@ -1,6 +1,6 @@
 import { webhookCallback } from "https://esm.sh/grammy@1.27.0";
 import { bot } from "./bot.ts";
-import { supabase, ensureUser, addTransaction, addDebt, getSummary, checkAndIncrementUsage, saveChatMessage, getChatHistory, updateLastDebtPerson } from "./db.ts";
+import { supabase, ensureUser, addTransaction, addDebt, getSummary, checkAndIncrementUsage, saveChatMessage, getChatHistory, updateLastDebtPerson, checkAndResolveRecentDebtPerson } from "./db.ts";
 import { parseIntent, categorizeTransaction } from "./ai.ts";
 
 const handleUpdate = webhookCallback(bot, "std/http");
@@ -131,6 +131,15 @@ Deno.serve(async (req) => {
             }
 
             await saveChatMessage(user_id, "user", text);
+
+            // 1. Direct debt target resolver check
+            const resolvedDebt = await checkAndResolveRecentDebtPerson(user_id, text);
+            if (resolvedDebt) {
+                const msg = `✅ Qarz egasi "${resolvedDebt.person_name}" deb saqlandi! (${Number(resolvedDebt.amount).toLocaleString()} so'm)`;
+                await saveChatMessage(user_id, "assistant", msg);
+                return jsonRes({ success: true, intent: "update_last_debt", message: msg });
+            }
+
             const chatHistory = await getChatHistory(user_id, 15);
             const summary = await getSummary(user_id);
             const parsed = await parseIntent(text, summary, chatHistory);

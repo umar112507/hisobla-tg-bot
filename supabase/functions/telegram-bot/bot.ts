@@ -1,5 +1,5 @@
 import { Bot, InlineKeyboard } from "https://esm.sh/grammy@1.27.0";
-import { ensureUser, addTransaction, addDebt, getDebts, getSummary, checkAndIncrementUsage, saveChatMessage, getChatHistory, updateLastDebtPerson } from "./db.ts";
+import { ensureUser, addTransaction, addDebt, getDebts, getSummary, checkAndIncrementUsage, saveChatMessage, getChatHistory, updateLastDebtPerson, checkAndResolveRecentDebtPerson } from "./db.ts";
 import { categorizeTransaction, parseIntent, transcribeAudio } from "./ai.ts";
 
 const BOT_TOKEN = Deno.env.get("BOT_TOKEN") || "";
