@@ -762,3 +762,143 @@ function updateModalProfileData(data) {
         }
     }
 }
+
+// ─── Web Speech API & Groq Voice Input ─────────────────────────
+let recognition = null;
+let isRecordingVoice = false;
+
+function initSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return null;
+
+    const rec = new SpeechRecognition();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = 'uz-UZ';
+
+    rec.onstart = () => {
+        isRecordingVoice = true;
+        const fab = document.getElementById("voiceFabBtn");
+        const overlay = document.getElementById("voiceOverlay");
+        const status = document.getElementById("voiceOverlayStatus");
+        const transcript = document.getElementById("voiceOverlayTranscript");
+
+        if (fab) fab.classList.add("recording");
+        if (overlay) overlay.classList.remove("hidden");
+        if (status) status.textContent = "🎙️ Eshitilmoqda...";
+        if (transcript) transcript.textContent = "O'zbek tilida gapiring...";
+    };
+
+    rec.onresult = (event) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
+            } else {
+                interimTranscript += event.results[i][0].transcript;
+            }
+        }
+
+        const transcriptEl = document.getElementById("voiceOverlayTranscript");
+        if (transcriptEl) {
+            transcriptEl.textContent = finalTranscript || interimTranscript || "Eshitilmoqda...";
+        }
+
+        if (finalTranscript.trim()) {
+            stopVoiceInput();
+            sendTextIntentToGroq(finalTranscript.trim());
+        }
+    };
+
+    rec.onerror = (event) => {
+        console.warn("Speech recognition error:", event.error);
+        stopVoiceInput();
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
+            alert("Ovozli kiritishda xatolik yuz berdi: " + event.error);
+        }
+    };
+
+    rec.onend = () => {
+        isRecordingVoice = false;
+        const fab = document.getElementById("voiceFabBtn");
+        const overlay = document.getElementById("voiceOverlay");
+        if (fab) fab.classList.remove("recording");
+        if (overlay) overlay.classList.add("hidden");
+    };
+
+    return rec;
+}
+
+function toggleVoiceInput() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("Brauzeringizda Web Speech API qo'llab-quvvatlanmaydi. Iltimos, Chrome yoki Telegram ichki brauzeridan foydalaning.");
+        return;
+    }
+
+    if (isRecordingVoice && recognition) {
+        stopVoiceInput();
+        return;
+    }
+
+    if (!recognition) {
+        recognition = initSpeechRecognition();
+    }
+
+    if (recognition) {
+        try {
+            recognition.start();
+        } catch (e) {
+            console.error("Start recognition error:", e);
+        }
+    }
+}
+
+function stopVoiceInput(e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (recognition && isRecordingVoice) {
+        try {
+            recognition.stop();
+        } catch (err) { }
+    }
+    isRecordingVoice = false;
+    const fab = document.getElementById("voiceFabBtn");
+    const overlay = document.getElementById("voiceOverlay");
+    if (fab) fab.classList.remove("recording");
+    if (overlay) overlay.classList.add("hidden");
+}
+
+async function sendTextIntentToGroq(text) {
+    try {
+        const overlay = document.getElementById("voiceOverlay");
+        const status = document.getElementById("voiceOverlayStatus");
+        const transcriptEl = document.getElementById("voiceOverlayTranscript");
+
+        if (overlay) overlay.classList.remove("hidden");
+        if (status) status.textContent = "⚡ Groq AI tahlil qilmoqda...";
+        if (transcriptEl) transcriptEl.innerHTML = `<i>"${escHtml(text)}"</i>`;
+
+        const res = await fetch(`${API_BASE}/api/intent`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, user_id: USER_ID })
+        });
+
+        const data = await res.json();
+        if (overlay) overlay.classList.add("hidden");
+
+        if (data.success) {
+            alert(data.message || "✅ Muvaffaqiyatli saqlandi!");
+            loadAll();
+        } else {
+            alert("❌ " + (data.error || "Xatolik yuz berdi"));
+        }
+    } catch (err) {
+        console.error("Send intent error:", err);
+        const overlay = document.getElementById("voiceOverlay");
+        if (overlay) overlay.classList.add("hidden");
+        alert("❌ Ulanishda xatolik yuz berdi.");
+    }
+}

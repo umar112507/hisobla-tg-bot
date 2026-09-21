@@ -1,6 +1,7 @@
 import { webhookCallback } from "https://esm.sh/grammy@1.27.0";
 import { bot } from "./bot.ts";
-import { supabase } from "./db.ts";
+import { supabase, ensureUser, addTransaction, addDebt, getSummary, checkAndIncrementUsage } from "./db.ts";
+import { parseIntent } from "./ai.ts";
 
 const handleUpdate = webhookCallback(bot, "std/http");
 // @ts-ignore Deno global
@@ -112,6 +113,47 @@ Deno.serve(async (req) => {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+    }
+
+    // API Endpoint: Process Text / Voice Intent via Groq AI
+    if (req.method === "POST" && url.pathname.endsWith("/api/intent")) {
+        try {
+            const body = await req.json();
+            const { text, user_id } = body;
+
+            if (!text || !user_id) {
+                return jsonRes({ error: "Text va user_id kerak" }, 400);
+            }
+
+            const canUse = await checkAndIncrementUsage(user_id);
+            if (!canUse) {
+                return jsonRes({ error: "Haftalik limit tugadi!", limit_reached: true }, 403);
+            }
+
+            const summary = await getSummary(user_id);
+            const parsed = await parseIntent(text, summary);
+
+            if (parsed.intent === "expense" && parsed.amount) {
+                await addTransaction(user_id, "expense", parsed.amount, parsed.category || "Xarajat", parsed.description || text);
+                return jsonRes({ success: true, intent: "expense", message: `💸 ${Number(parsed.amount).toLocaleString()} so'm xarajat qo'shildi` });
+            } else if (parsed.intent === "income" && parsed.amount) {
+                await addTransaction(user_id, "income", parsed.amount, parsed.category || "Daromad", parsed.description || text);
+                return jsonRes({ success: true, intent: "income", message: `💰 ${Number(parsed.amount).toLocaleString()} so'm daromad qo'shildi` });
+            } else if (parsed.intent === "debt_gave" && parsed.person && parsed.amount) {
+                await addDebt(user_id, "gave", parsed.person, Number(parsed.amount), text, parsed.due_date);
+                await addTransaction(user_id, "expense", Number(parsed.amount), "Qarz berish", `${parsed.person} ga qarz berildi`);
+                return jsonRes({ success: true, intent: "debt_gave", message: `📤 ${parsed.person} ga ${Number(parsed.amount).toLocaleString()} so'm qarz saqlandi` });
+            } else if (parsed.intent === "debt_received" && parsed.person && parsed.amount) {
+                await addDebt(user_id, "received", parsed.person, Number(parsed.amount), text, parsed.due_date);
+                await addTransaction(user_id, "income", Number(parsed.amount), "Qarz olish", `${parsed.person} dan qarz olindi`);
+                return jsonRes({ success: true, intent: "debt_received", message: `📥 ${parsed.person} dan ${Number(parsed.amount).toLocaleString()} so'm qarz saqlandi` });
+            } else {
+                return jsonRes({ success: true, intent: "ai_reply", message: parsed.reply || "🤖 Tushundim!" });
+            }
+        } catch (e: any) {
+            console.error("Process intent API error:", e);
+            return jsonRes({ error: "Xatolik yuz berdi" }, 500);
+        }
     }
 
     // API Endpoint: Delete Transaction
