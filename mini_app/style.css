@@ -40,6 +40,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.hidden {
+  display: none !important;
+}
+
 /* Premium Animated Background */
 .bg-orbs {
   position: fixed;
@@ -222,40 +226,46 @@ button,
   font-weight: 400;
 }
 
-.header-premium-btn {
-  font-size: 10px;
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.header-badge-btn {
+  font-size: 11px;
   font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 20px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   letter-spacing: 0.2px;
+  white-space: nowrap;
 }
 
-.header-premium-btn:active {
+.header-badge-btn:active {
   transform: scale(0.94);
 }
 
-.header-premium-btn.pro-get-btn {
-  background: rgba(68, 138, 255, 0.12);
+.header-badge-btn.pro-get-btn {
+  background: linear-gradient(135deg, rgba(68, 138, 255, 0.15), rgba(0, 230, 118, 0.15));
   color: #60a5fa;
   border: 1px solid rgba(96, 165, 250, 0.35);
-  box-shadow: 0 0 12px rgba(68, 138, 255, 0.15);
+  box-shadow: 0 2px 10px rgba(68, 138, 255, 0.15);
 }
 
-.header-premium-btn.pro-get-btn:hover {
-  background: rgba(68, 138, 255, 0.22);
+.header-badge-btn.pro-get-btn:hover {
+  background: linear-gradient(135deg, rgba(68, 138, 255, 0.25), rgba(0, 230, 118, 0.25));
   border-color: rgba(96, 165, 250, 0.6);
 }
 
-.header-premium-btn.pro-active-badge {
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.18), rgba(245, 158, 11, 0.18));
+.header-badge-btn.pro-active-badge {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(245, 158, 11, 0.2));
   color: #fbbf24;
-  border: 1px solid rgba(251, 191, 36, 0.45);
-  box-shadow: 0 0 14px rgba(251, 191, 36, 0.2);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  box-shadow: 0 2px 12px rgba(251, 191, 36, 0.25);
 }
 
 .premium-expiry-badge {

@@ -108,51 +108,27 @@ async function loadSummary(isSilent = false) {
         document.getElementById("totalIncome").textContent = formatAmount(data.total_income || 0);
         document.getElementById("totalExpense").textContent = formatAmount(data.total_expense || 0);
 
-        const pBtn = document.getElementById("headerPremiumBtn");
-        const pExp = document.getElementById("premiumExpiryText");
-        const pLimit = document.getElementById("userLimitText");
-
-        if (data.is_premium) {
-            pBtn.className = "header-premium-btn pro-active-badge";
-            pBtn.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg> <span>PRO</span>`;
-
-            if (data.premium_expires_at) {
-                startLiveTicker(data.premium_expires_at);
-                pExp.classList.remove("hidden");
+        const bBtn = document.getElementById("headerBadgeBtn");
+        if (bBtn) {
+            if (data.is_premium) {
+                bBtn.className = "header-badge-btn pro-active-badge";
+                bBtn.innerHTML = `👑 <span>PRO Active</span>`;
+                if (data.premium_expires_at) {
+                    startLiveTicker(data.premium_expires_at);
+                }
             } else {
-                if (liveTickerTimer) clearInterval(liveTickerTimer);
-                pExp.textContent = "· PRO active";
-                pExp.classList.remove("hidden");
-            }
-            if (pLimit) pLimit.classList.add("hidden");
-        } else {
-            if (liveTickerTimer) clearInterval(liveTickerTimer);
-            pBtn.className = "header-premium-btn pro-get-btn";
-            pBtn.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> <span>PRO 'ga o'tish</span>`;
-            pExp.classList.add("hidden");
-
-            // Display free limit
-            if (pLimit) {
+                bBtn.className = "header-badge-btn pro-get-btn";
                 const used = data.usage_count || 0;
                 const total = data.weekly_limit || 10;
                 const rem = Math.max(0, total - used);
-                pLimit.textContent = `· Limit: ${rem}/${total} ta`;
-                pLimit.classList.remove("hidden");
+                bBtn.innerHTML = `⚡ <span>${rem}/${total} · PRO</span>`;
             }
         }
 
         updateModalProfileData(data);
         renderCharts(data.categories || []);
         generateAIInsight(data.categories || [], data.total_expense || 0);
-
-        // Load balance visibility state from local storage
-        if (localStorage.getItem("hideBalance") === "true") {
-            const amountEl = document.getElementById("balanceAmount");
-            amountEl.dataset.actual = amountEl.textContent;
-            amountEl.textContent = "••••••";
-            document.getElementById("eyeIconOpen").classList.add("hidden");
-            document.getElementById("eyeIconClosed").classList.remove("hidden");
-        }
+        updateBalanceDisplay();
     } catch (e) {
         if (!isSilent) console.error("Summary load failed:", e);
     }
@@ -510,28 +486,29 @@ function toggleBalance() {
     const isHidden = localStorage.getItem("hideBalance") === "true";
     const newHidden = !isHidden;
     localStorage.setItem("hideBalance", newHidden.toString());
+    updateBalanceDisplay();
+}
 
+function updateBalanceDisplay() {
+    const isHidden = localStorage.getItem("hideBalance") === "true";
     const amountEl = document.getElementById("balanceAmount");
     const openEye = document.getElementById("eyeIconOpen");
     const closedEye = document.getElementById("eyeIconClosed");
 
-    if (newHidden) {
-        // Save actual before hiding
-        if (amountEl.textContent !== "••••••") {
-            amountEl.dataset.actual = amountEl.textContent;
-        }
+    if (!amountEl) return;
+
+    if (summaryData) {
+        amountEl.textContent = formatAmount(summaryData.balance || 0);
+        amountEl.className = "balance-amount " + ((summaryData.balance || 0) >= 0 ? "positive" : "negative");
+    }
+
+    if (isHidden) {
         amountEl.textContent = "••••••";
-        openEye.classList.add("hidden");
-        closedEye.classList.remove("hidden");
+        if (openEye) openEye.classList.add("hidden");
+        if (closedEye) closedEye.classList.remove("hidden");
     } else {
-        // Restore actual
-        if (amountEl.dataset.actual) {
-            amountEl.textContent = amountEl.dataset.actual;
-        } else if (summaryData) {
-            amountEl.textContent = formatAmount(summaryData.balance || 0);
-        }
-        openEye.classList.remove("hidden");
-        closedEye.classList.add("hidden");
+        if (openEye) openEye.classList.remove("hidden");
+        if (closedEye) closedEye.classList.add("hidden");
     }
 }
 
@@ -598,23 +575,25 @@ function startLiveTicker(expiryIsoStr) {
     if (liveTickerTimer) clearInterval(liveTickerTimer);
 
     const updateTicker = () => {
-        const pExp = document.getElementById("premiumExpiryText");
+        const bBtn = document.getElementById("headerBadgeBtn");
         const diffMs = new Date(expiryIsoStr) - new Date();
         const diffSec = Math.ceil(diffMs / 1000);
 
         if (diffSec <= 0) {
-            if (pExp) pExp.textContent = "· Muddati tugagan";
+            if (bBtn) bBtn.innerHTML = `👑 <span>PRO Tugagan</span>`;
             clearInterval(liveTickerTimer);
             liveTickerTimer = null;
             loadSummary(true);
             return;
         }
 
-        if (diffSec <= 60) {
-            if (pExp) pExp.textContent = `· ${diffSec} sek qoldi`;
-        } else {
-            const diffDays = Math.ceil(diffSec / 86400);
-            if (pExp) pExp.textContent = `· ${diffDays} kun qoldi`;
+        if (bBtn) {
+            if (diffSec <= 60) {
+                bBtn.innerHTML = `👑 <span>PRO · ${diffSec}s</span>`;
+            } else {
+                const diffDays = Math.ceil(diffSec / 86400);
+                bBtn.innerHTML = `👑 <span>PRO · ${diffDays}d</span>`;
+            }
         }
     };
 
