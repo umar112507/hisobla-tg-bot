@@ -440,8 +440,33 @@ function renderPieChart(canvasId, data, palette, instanceVar) {
 // ─── AI Insights ──────────────────────────────────────────────
 function generateAIInsight(categories, totalExpense) {
     const aiBox = document.getElementById("aiInsight");
-    const aiText = document.getElementById("aiInsightText");
-    if (!aiBox || !aiText) return;
+    if (!aiBox) return;
+
+    const isPro = summaryData && summaryData.is_premium;
+
+    if (!isPro) {
+        aiBox.innerHTML = `
+            <div class="ai-insight-header">
+                <span class="ai-insight-icon">🤖</span>
+                <span class="ai-insight-title">AI Tahlil</span>
+                <span class="pro-lock-badge">🔒 PRO xususiyat</span>
+            </div>
+            <div class="ai-insight-locked-container">
+                <div class="ai-insight-skeleton-blur">
+                    <div class="skeleton-line long"></div>
+                    <div class="skeleton-line medium"></div>
+                    <div class="skeleton-line short"></div>
+                </div>
+                <div class="ai-insight-lock-overlay" onclick="openPremiumModal()">
+                    <div class="lock-icon-circle">🔒</div>
+                    <div class="lock-title">AI Moliyaviy Tahlildan foydalanish uchun PRO ga o'ting</div>
+                    <button class="lock-pro-btn">⚡ PRO'ga o'tish</button>
+                </div>
+            </div>
+        `;
+        aiBox.style.display = "block";
+        return;
+    }
 
     const expenseCats = categories.filter(c => c.type === "expense");
     if (expenseCats.length === 0 || totalExpense <= 0) {
@@ -462,7 +487,14 @@ function generateAIInsight(categories, totalExpense) {
         message += " Xarajatlaringiz nisbatan yaxshi taqsimlangan.";
     }
 
-    aiText.innerHTML = message;
+    aiBox.innerHTML = `
+        <div class="ai-insight-header">
+            <span class="ai-insight-icon">🤖</span>
+            <span class="ai-insight-title">AI Tahlil</span>
+            <span class="pro-active-badge">✨ PRO</span>
+        </div>
+        <div class="ai-insight-text">${message}</div>
+    `;
     aiBox.style.display = "block";
 }
 
