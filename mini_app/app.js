@@ -143,6 +143,16 @@ async function loadSummary(isSilent = false) {
 
         updateModalProfileData(data);
         renderCharts(data.categories || []);
+        generateAIInsight(data.categories || [], data.total_expense || 0);
+
+        // Load balance visibility state from local storage
+        if (localStorage.getItem("hideBalance") === "true") {
+            const amountEl = document.getElementById("balanceAmount");
+            amountEl.dataset.actual = amountEl.textContent;
+            amountEl.textContent = "••••••";
+            document.getElementById("eyeIconOpen").classList.add("hidden");
+            document.getElementById("eyeIconClosed").classList.remove("hidden");
+        }
     } catch (e) {
         if (!isSilent) console.error("Summary load failed:", e);
     }
@@ -196,14 +206,32 @@ function renderTransactions(transactions) {
 
     container.innerHTML = filtered.map(t => {
         const isIncome = t.type === "income";
-        const svgIcon = isIncome
-            ? `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>`
-            : `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></svg>`;
+
+        const categoryEmojis = {
+            "Ovqat": "🍔", "Transport": "🚗", "Maosh": "💼", "Kommunal": "💡",
+            "Kiyim": "👕", "Sog'liq": "💊", "Ijara": "🏠", "Internet": "🌐",
+            "O'yin-kulgi": "🎮", "Ta'lim": "📚", "Sayohat": "✈️", "Oziq-ovqat": "🛒",
+            "Sovg'a": "🎁", "Boshqa": "📦", "Qarz to'lovi": "💵", "Qarz qaytishi": "💸"
+        };
+        const catName = t.category || "Boshqa";
+        let fallbackEmoji = isIncome ? "💰" : "📉";
+        // Check if catName matches directly, or find first matching substring
+        let emoji = categoryEmojis[catName];
+        if (!emoji) {
+            for (const [k, v] of Object.entries(categoryEmojis)) {
+                if (catName.toLowerCase().includes(k.toLowerCase())) {
+                    emoji = v;
+                    break;
+                }
+            }
+        }
+        if (!emoji) emoji = fallbackEmoji;
+
         const dateStr = formatDate(t.created_at);
         const sign = isIncome ? "+" : "-";
         return `
       <div class="tx-item">
-        <div class="tx-icon-wrap ${t.type}">${svgIcon}</div>
+        <div class="tx-icon-wrap ${t.type}">${emoji}</div>
         <div class="tx-info">
           <div class="tx-desc">${escHtml(t.description || "—")}</div>
           <div class="tx-meta">
@@ -314,7 +342,7 @@ function renderDebts(debts) {
         }
 
         const dirText = d.direction === "gave" ? "📤 Berdim" : "📥 Oldim";
-        const payBtnText = d.direction === "received" ? "✅ To'ladim (Balansdan ayirish)" : "✅ Qaytdi (Balansga qo'shish)";
+        const payBtnText = d.direction === "received" ? "✅ To'landi" : "✅ Qaytdi";
 
         return `
       <div class="debt-item ${urgencyClass}">
@@ -384,8 +412,32 @@ function renderPieChart(canvasId, data, palette, instanceVar) {
     }
 
     const labels = data.map(d => d.category);
-    const values = data.map(d => d.total);
+    const values = data.map(d => Number(d.total)); // Ensure values are numbers
+    const totalSum = values.reduce((a, b) => a + b, 0);
     const colors = palette.slice(0, data.length);
+
+    // Explicitly update the center label DOM elements
+    const centerEl = document.getElementById(canvasId + "Center");
+    if (centerEl) {
+        const title = canvasId === "expenseChart" ? "Jami xarajat" : "Jami daromad";
+        centerEl.innerHTML = `<span>${title}</span>${formatAmount(totalSum).replace(' so\'m', '')}`;
+    }
+
+    // Render legend table
+    const legendEl = document.getElementById(canvasId.replace('Chart', 'Legend'));
+    if (legendEl) {
+        legendEl.innerHTML = data.map((d, i) => {
+            const pct = Math.round((Number(d.total) / totalSum) * 100);
+            return `
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:12px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="width:10px;height:10px;border-radius:50%;background:${colors[i]}"></span>
+                <span style="color:var(--text-secondary)">${escHtml(d.category)}</span>
+              </div>
+              <div style="font-weight:600;">${pct}%</div>
+            </div>`;
+        }).join('');
+    }
 
     window[instanceVar] = new Chart(canvas, {
         type: "doughnut",
@@ -404,16 +456,45 @@ function renderPieChart(canvasId, data, palette, instanceVar) {
                     }
                 }
             },
-            cutout: "65%",
+            cutout: "75%", // Increased cutout to make room for center text
         }
     });
 }
 
-// ─── Tabs & Filters ───────────────────────────────────────────
+// ─── AI Insights ──────────────────────────────────────────────
+function generateAIInsight(categories, totalExpense) {
+    const aiBox = document.getElementById("aiInsight");
+    const aiText = document.getElementById("aiInsightText");
+    if (!aiBox || !aiText) return;
+
+    const expenseCats = categories.filter(c => c.type === "expense");
+    if (expenseCats.length === 0 || totalExpense <= 0) {
+        aiBox.style.display = "none";
+        return;
+    }
+
+    // Sort by highest expense
+    expenseCats.sort((a, b) => b.total - a.total);
+    const topCat = expenseCats[0];
+    const topPct = Math.round((topCat.total / totalExpense) * 100);
+
+    let message = `💡 Ushbu oyda xarajatlaringizning eng katta qismi <b>${escHtml(topCat.category)}</b> (${topPct}%) hissasiga to'g'ri kelmoqda.`;
+
+    if (topPct > 50) {
+        message += " Bunday katta ulush e'tiboringizni talab qilishi mumkin. Boshqa xarajatlarni ham muvozanatda saqlang!";
+    } else {
+        message += " Xarajatlaringiz nisbatan yaxshi taqsimlangan.";
+    }
+
+    aiText.innerHTML = message;
+    aiBox.style.display = "block";
+}
+
+// ─── Tabs & Filters & Toggles ─────────────────────────────────
 function setupTabs() {
-    document.querySelectorAll(".tab-btn").forEach(btn => {
+    document.querySelectorAll(".bottom-nav-btn").forEach(btn => {
         btn.addEventListener("click", () => {
-            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".bottom-nav-btn").forEach(b => b.classList.remove("active"));
             document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
             btn.classList.add("active");
             document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
@@ -423,6 +504,35 @@ function setupTabs() {
             }
         });
     });
+}
+
+function toggleBalance() {
+    const isHidden = localStorage.getItem("hideBalance") === "true";
+    const newHidden = !isHidden;
+    localStorage.setItem("hideBalance", newHidden.toString());
+
+    const amountEl = document.getElementById("balanceAmount");
+    const openEye = document.getElementById("eyeIconOpen");
+    const closedEye = document.getElementById("eyeIconClosed");
+
+    if (newHidden) {
+        // Save actual before hiding
+        if (amountEl.textContent !== "••••••") {
+            amountEl.dataset.actual = amountEl.textContent;
+        }
+        amountEl.textContent = "••••••";
+        openEye.classList.add("hidden");
+        closedEye.classList.remove("hidden");
+    } else {
+        // Restore actual
+        if (amountEl.dataset.actual) {
+            amountEl.textContent = amountEl.dataset.actual;
+        } else if (summaryData) {
+            amountEl.textContent = formatAmount(summaryData.balance || 0);
+        }
+        openEye.classList.remove("hidden");
+        closedEye.classList.add("hidden");
+    }
 }
 
 function setupFilters() {

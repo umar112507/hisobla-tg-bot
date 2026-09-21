@@ -62,7 +62,23 @@
     <!-- Balance Card -->
     <section class="balance-section">
       <div class="balance-card glass-card">
-        <div class="balance-label">Umumiy balans</div>
+        <div class="balance-top-row">
+          <div class="balance-label">Umumiy balans</div>
+          <button class="balance-toggle-btn" id="balanceToggleBtn" onclick="toggleBalance()"
+            title="Balansni yashirish/ko'rsatish">
+            <svg id="eyeIconOpen" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            <svg id="eyeIconClosed" class="hidden" viewBox="0 0 24 24" width="20" height="20" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path
+                d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+              <line x1="1" y1="1" x2="23" y2="23" />
+            </svg>
+          </button>
+        </div>
         <div class="balance-amount" id="balanceAmount">—</div>
         <div class="balance-stats">
           <div class="stat-item income-stat">
@@ -96,37 +112,7 @@
       </div>
     </section>
 
-    <!-- Navigation Tabs -->
-    <nav class="tabs">
-      <button class="tab-btn active" data-tab="transactions">
-        <svg class="tab-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" y1="13" x2="8" y2="13" />
-          <line x1="16" y1="17" x2="8" y2="17" />
-          <polyline points="10 9 9 9 8 9" />
-        </svg>
-        <span>Tranzaksiyalar</span>
-      </button>
-      <button class="tab-btn" data-tab="debts">
-        <svg class="tab-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-          <line x1="1" y1="10" x2="23" y2="10" />
-        </svg>
-        <span>Qarzlar</span>
-      </button>
-      <button class="tab-btn" data-tab="statistics">
-        <svg class="tab-svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="20" x2="18" y2="10" />
-          <line x1="12" y1="20" x2="12" y2="4" />
-          <line x1="6" y1="20" x2="6" y2="14" />
-        </svg>
-        <span>Statistika</span>
-      </button>
-    </nav>
+    <!-- Tab spacer (navigation moved to bottom bar) -->
 
     <!-- Transactions Tab -->
     <div class="tab-content active" id="tab-transactions">
@@ -170,14 +156,26 @@
           <h3 class="chart-title">Xarajatlar taqsimoti</h3>
           <div class="chart-wrapper">
             <canvas id="expenseChart"></canvas>
+            <div class="chart-center-label" id="expenseChartCenter"></div>
           </div>
+          <div class="chart-legend-table" id="expenseLegend"></div>
         </div>
         <div class="chart-card glass-card">
           <h3 class="chart-title">Daromadlar taqsimoti</h3>
           <div class="chart-wrapper">
             <canvas id="incomeChart"></canvas>
+            <div class="chart-center-label" id="incomeChartCenter"></div>
           </div>
+          <div class="chart-legend-table" id="incomeLegend"></div>
         </div>
+      </div>
+      <!-- AI Smart Insight -->
+      <div class="ai-insight glass-card" id="aiInsight" style="display:none;">
+        <div class="ai-insight-header">
+          <span class="ai-insight-icon">🤖</span>
+          <span class="ai-insight-title">AI Tahlil</span>
+        </div>
+        <div class="ai-insight-text" id="aiInsightText"></div>
       </div>
     </div>
 
@@ -324,6 +322,16 @@
             eksklyuziv statistikani qo'lga kiriting.</p>
         </div>
 
+        <!-- PRO Features Checklist -->
+        <ul class="pro-features-list">
+          <li><span class="pro-feature-icon">♾️</span> Cheksiz xabarlar va tranzaksiyalar</li>
+          <li><span class="pro-feature-icon">🎙️</span> Cheksiz ovozli xabarlar</li>
+          <li><span class="pro-feature-icon">📊</span> Kengaytirilgan AI statistikasi</li>
+          <li><span class="pro-feature-icon">🔔</span> Avtomatik qarz eslatmalari</li>
+          <li><span class="pro-feature-icon">🎨</span> Maxsus mavzular va ranglar</li>
+          <li><span class="pro-feature-icon">⚡</span> Ustuvor texnik yordam</li>
+        </ul>
+
         <!-- Coupon Activation Form -->
         <div class="coupon-activate-card glass-card">
           <div class="coupon-header">
@@ -335,7 +343,7 @@
             </svg>
             <span>Promo-kod (Kupon) bormi?</span>
           </div>
-          <div class="coupon-input-wrap">
+          <div class="coupon-input-wrap coupon-stacked">
             <input type="text" id="userCouponCode" placeholder="Masalan: HISOBLA50" />
             <button class="coupon-activate-btn" onclick="activateCoupon()">Faollashtirish</button>
           </div>
@@ -398,6 +406,37 @@
       </div>
     </div>
   </div>
+
+  <!-- Bottom Navigation Bar -->
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="bottom-nav-btn active" data-tab="transactions">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+      </svg>
+      <span>Tranzaksiyalar</span>
+    </button>
+    <button class="bottom-nav-btn" data-tab="debts">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"
+        stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+        <line x1="1" y1="10" x2="23" y2="10" />
+      </svg>
+      <span>Qarzlar</span>
+    </button>
+    <button class="bottom-nav-btn" data-tab="statistics">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"
+        stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="6" y1="20" x2="6" y2="14" />
+      </svg>
+      <span>Statistika</span>
+    </button>
+  </nav>
 
   <script src="app.js"></script>
 </body>

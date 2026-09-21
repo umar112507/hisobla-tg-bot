@@ -110,9 +110,11 @@ async function processIntent(ctx: any, user: any, text: string) {
         await handleIncome(ctx, `${parsed.amount} ${parsed.description || text}`);
     } else if (parsed.intent === "debt_gave" && parsed.person && parsed.amount) {
         await addDebt(user.id, "gave", parsed.person, Number(parsed.amount), text, parsed.due_date);
+        await addTransaction(user.id, "expense", Number(parsed.amount), "Qarz berish", `${parsed.person} ga qarz berildi`);
         await ctx.reply(`📤 <b>Qarz berganingiz saqlandi!</b>\n\n👤 <b>Kim:</b> ${parsed.person}\n💵 <b>Miqdor:</b> ${Number(parsed.amount).toLocaleString()} so'm`, { parse_mode: "HTML" });
     } else if (parsed.intent === "debt_received" && parsed.person && parsed.amount) {
         await addDebt(user.id, "received", parsed.person, Number(parsed.amount), text, parsed.due_date);
+        await addTransaction(user.id, "income", Number(parsed.amount), "Qarz olish", `${parsed.person} dan qarz olindi`);
         await ctx.reply(`📥 <b>Qarz olganingiz saqlandi!</b>\n\n👤 <b>Kim:</b> ${parsed.person}\n💵 <b>Miqdor:</b> ${Number(parsed.amount).toLocaleString()} so'm`, { parse_mode: "HTML" });
     } else if (parsed.intent === "report") {
         await handleReport(ctx);
