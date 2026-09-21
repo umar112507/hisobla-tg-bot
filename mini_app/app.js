@@ -831,7 +831,24 @@ function initSpeechRecognition() {
     return rec;
 }
 
-function toggleVoiceInput() {
+let audioStreamPermissionGranted = false;
+
+async function requestMicrophonePermission() {
+    if (audioStreamPermissionGranted) return true;
+    try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(track => track.stop());
+            audioStreamPermissionGranted = true;
+            return true;
+        }
+    } catch (e) {
+        console.warn("Microphone permission denied:", e);
+    }
+    return false;
+}
+
+async function toggleVoiceInput() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         alert("Brauzeringizda Web Speech API qo'llab-quvvatlanmaydi. Iltimos, Chrome yoki Telegram ichki brauzeridan foydalaning.");
@@ -840,6 +857,12 @@ function toggleVoiceInput() {
 
     if (isRecordingVoice && recognition) {
         stopVoiceInput();
+        return;
+    }
+
+    const permitted = await requestMicrophonePermission();
+    if (!permitted) {
+        alert("Mikrofon ruxsati berilmadi. Iltimos, brauzer sozlamalaridan mikrofonga ruxsat bering.");
         return;
     }
 

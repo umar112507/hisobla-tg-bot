@@ -1,7 +1,7 @@
 import { webhookCallback } from "https://esm.sh/grammy@1.27.0";
 import { bot } from "./bot.ts";
 import { supabase, ensureUser, addTransaction, addDebt, getSummary, checkAndIncrementUsage } from "./db.ts";
-import { parseIntent } from "./ai.ts";
+import { parseIntent, categorizeTransaction } from "./ai.ts";
 
 const handleUpdate = webhookCallback(bot, "std/http");
 // @ts-ignore Deno global
@@ -134,11 +134,13 @@ Deno.serve(async (req) => {
             const parsed = await parseIntent(text, summary);
 
             if (parsed.intent === "expense" && parsed.amount) {
-                await addTransaction(user_id, "expense", parsed.amount, parsed.category || "Xarajat", parsed.description || text);
-                return jsonRes({ success: true, intent: "expense", message: `💸 ${Number(parsed.amount).toLocaleString()} so'm xarajat qo'shildi` });
+                const category = await categorizeTransaction(parsed.description || text, "expense");
+                await addTransaction(user_id, "expense", parsed.amount, category, parsed.description || text);
+                return jsonRes({ success: true, intent: "expense", message: `💸 ${category}: ${Number(parsed.amount).toLocaleString()} so'm qo'shildi` });
             } else if (parsed.intent === "income" && parsed.amount) {
-                await addTransaction(user_id, "income", parsed.amount, parsed.category || "Daromad", parsed.description || text);
-                return jsonRes({ success: true, intent: "income", message: `💰 ${Number(parsed.amount).toLocaleString()} so'm daromad qo'shildi` });
+                const category = await categorizeTransaction(parsed.description || text, "income");
+                await addTransaction(user_id, "income", parsed.amount, category, parsed.description || text);
+                return jsonRes({ success: true, intent: "income", message: `💰 ${category}: ${Number(parsed.amount).toLocaleString()} so'm qo'shildi` });
             } else if (parsed.intent === "debt_gave" && parsed.person && parsed.amount) {
                 await addDebt(user_id, "gave", parsed.person, Number(parsed.amount), text, parsed.due_date);
                 await addTransaction(user_id, "expense", Number(parsed.amount), "Qarz berish", `${parsed.person} ga qarz berildi`);
