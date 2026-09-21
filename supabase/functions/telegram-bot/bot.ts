@@ -94,10 +94,39 @@ bot.on("message:text", async (ctx) => {
 });
 
 bot.on("message:voice", async (ctx) => {
-    const user = ctx.from;
+    const user = ctx.from!;
     await ensureUser(user.id, user.username, user.first_name, user.last_name);
 
-    await ctx.reply("🎙️ Tez orada ovozli xabar orqali hisoblash ishga tushiriladi!\n\nIltimos, hozircha xarajatlaringizni yozma ravishda kiriting. Bizni qo'llab-quvvatlayotganingiz uchun rahmat, siz eng zo'risiz! 😊");
+    // Bepul xabarlar limitini tekshirish
+    const canUse = await checkAndIncrementUsage(user.id);
+    if (!canUse) {
+        const premiumUrl = `${MINI_APP_URL}?user_id=${user.id}#tab-premium`;
+        await ctx.reply("⚠️ <b>Haftalik limit tugadi!</b>\n\nSiz haftalik bepul beriladigan 10 ta xabar limitidan foydalanib bo'ldingiz.\n\nCheksiz yozish, ovozli xabarlar va eksklyuziv imkoniyatlardan foydalanish uchun <b>Premium</b> xarid qiling!", {
+            parse_mode: "HTML",
+            reply_markup: new InlineKeyboard().webApp("👑 Premium Xarid Qilish", premiumUrl)
+        });
+        return;
+    }
+
+    await ctx.replyWithChatAction("typing");
+
+    try {
+        const voice = ctx.message.voice;
+        const file = await ctx.api.getFile(voice.file_id);
+        const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+
+        const transcribed = await transcribeAudio(fileUrl);
+        if (!transcribed || !transcribed.trim()) {
+            await ctx.reply("❌ Ovozli xabarni tushunib bo'lmadi. Iltimos, qaytadan aniqroq gapiring yoki matn ko'rinishida yozing.");
+            return;
+        }
+
+        await ctx.reply(`🎙️ <b>Ovozli xabaringiz:</b> "<i>${transcribed}</i>"`, { parse_mode: "HTML" });
+        await processIntent(ctx, user, transcribed);
+    } catch (e) {
+        console.error("Voice processing error:", e);
+        await ctx.reply("❌ Ovozli xabarni qayta ishlashda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.");
+    }
 });
 
 async function processIntent(ctx: any, user: any, text: string) {

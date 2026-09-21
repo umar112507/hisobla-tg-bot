@@ -13,7 +13,13 @@ export async function categorizeTransaction(description: string, type: "income" 
     const prompt = `Tranzaksiya turi: ${type === "expense" ? "Xarajat" : "Daromad"}
 Tavsif: ${description}
 Mavjud kategoriyalar: ${categories.join(", ")}
-Faqat mos kategoriya nomini qaytaring. JSON: {"category": "Kategoriya"}`;
+
+ESLATMA: O'zbek tilidagi barcha imlo xatolar, dialekt va jargon so'zlarni e'tiborga oling:
+- "tushli", "abed", "abet", "obed", "kafe", "osh" -> Ovqat
+- "yolkira", "yo'l haqqi", "taksi", "benzin", "metan", "avto" -> Transport
+- "oyli", "oylik", "zarplata", "avans" -> Maosh
+
+Faqat mos kategoriya nomini qaytaring. JSON formatda: {"category": "Kategoriya"}`;
 
     try {
         if (GROQ_API_KEY) {
@@ -24,7 +30,7 @@ Faqat mos kategoriya nomini qaytaring. JSON: {"category": "Kategoriya"}`;
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    model: "llama3-70b-8192",
+                    model: "llama-3.3-70b-versatile",
                     messages: [{ role: "user", content: prompt }],
                     temperature: 0.1,
                     max_tokens: 50,
@@ -42,12 +48,12 @@ Faqat mos kategoriya nomini qaytaring. JSON: {"category": "Kategoriya"}`;
         console.error("Groq categorize error:", e);
     }
 
-    // Fallback keyword categorizer
+    // Fallback keyword categorizer with typo/slang tolerance
     const descLower = description.toLowerCase();
-    if (/oylik|maosh|zarplata|avans|ishhaqi|stipendiya/i.test(descLower)) return "Maosh";
+    if (/oylik|oyli|maosh|zarplata|avans|ishhaqi|ish\s*xaqi|stipendiya/i.test(descLower)) return "Maosh";
     if (/biznes|foyda|sotuv/i.test(descLower)) return "Biznes";
-    if (/taksi|avto|benzin|metan|propan|yo'l|bus/i.test(descLower)) return "Transport";
-    if (/ovqat|tushlik|non|go'sht|osh|kafe|restoran|do'kon|bozor/i.test(descLower)) return "Ovqat";
+    if (/taksi|taxi|yolkira|yo'l\s*kira|yol\s*haqqi|yo'l\s*haqqi|avto|benzin|metan|propan|yo'l|bus|marshrutka/i.test(descLower)) return "Transport";
+    if (/ovqat|tushlik|tushli|abed|abet|obed|non|go'sht|osh|kafe|restoran|do'kon|bozor|somsa/i.test(descLower)) return "Ovqat";
     if (/uy|ijara|arenda|remont/i.test(descLower)) return "Uy";
     if (/apteka|dori|vrach|shifokor/i.test(descLower)) return "Salomatlik";
     if (/kurs|maktab|univer|kitob/i.test(descLower)) return "Ta'lim";
@@ -61,32 +67,39 @@ export async function parseIntent(text: string, summaryContext?: any) {
     const today = new Date().toISOString().split("T")[0];
 
     const prompt = `Siz "Hisobla" moliyaviy AI yordamchisiz. Bugungi sana: ${today}.
-Matnni chuqur tahlil qiling va qarz, xarajat yoki daromad ekanligini ajrating.
+Matnni (yoki ovozdan o'girilgan matnni) chuqur tahlil qiling va qarz, xarajat yoki daromad ekanligini ajrating.
+
+IMLO XATOLARI VA SHEVA SHAKLLARI (IMPORTANT):
+1. Sonlar va birliklar:
+   - "min", "ming", "k", "m" -> 1 000 (masalan: "10 min", "10 ming", "10k" -> 10000)
+   - "mln", "million", "milon", "lem" -> 1 000 000 (masalan: "2 mln", "2 million" -> 2000000)
+2. Daromad va Oylik shakllari:
+   - "oyli", "oylik", "oylih", "maosh", "zarplata", "zarplat", "avans", "stipendiya" -> Daromad
+3. Xarajat va Tushlik/Transport shakllari:
+   - "tushli", "tushlik", "abed", "abet", "obed", "ovqat", "somsa", "osh" -> Xarajat (tushlik/ovqat)
+   - "yolkira", "yo'l kira", "yol haqqi", "yo'l haqqi", "taksi", "taxi", "benzin" -> Xarajat (taksi/transport)
+4. Qarz harakatlari:
+   - "qarz berdim", "berdim", "berudim", "berib turdim", "oldiga berdim" -> intent: "debt_gave"
+   - "qarz oldim", "oldim", "oluvdim", "olganim", "menga berdi" -> intent: "debt_received"
 
 QARZ QOIDALARI:
-1. QARZ BERILDI ("debt_gave"): Men kimgadir qarz bergan bo'lsam (masalan: "Ali ga 500000 qarz berdim", "Sardor 100 ming oldi", "Javohirga 200k berildi") -> intent: "debt_gave"
-2. QARZ OLINDI ("debt_received"): Men kimdandir qarz olgan bo'lsam (masalan: "Validan 200 ming qarz oldim", "Sobir menga 500k qarz berdi") -> intent: "debt_received"
+- QARZ BERILDI ("debt_gave"): Men kimgadir qarz bergan bo'lsam (masalan: "Ali ga 500 min qarz berdim", "Sardor 100k oldi", "Javohirga 200 min berildi") -> intent: "debt_gave"
+- QARZ OLINDI ("debt_received"): Men kimdandir qarz olgan bo'lsam (masalan: "Validan 200 min qarz oldim", "Sobir menga 500 min qarz berdi") -> intent: "debt_received"
 
 MUDDAT (due_date):
 - Agar muddat aytilgan bo'lsa (masalan: "10 kunga", "oy oxirigacha", "15-oktyabrgacha"), uni YYYY-MM-DD formatida hisoblab chiqaring.
 - Aks holda null.
 
-NUMERIK SHAKLLAR:
-- "ming" / "k" = 000 (10 ming -> 10000)
-- "mln" / "million" = 000000 (2 mln -> 2000000)
-
 Matn: "${text}"
 
-JSON qaytaring:
+Faqat toza JSON qaytaring:
 - Qarz berildi: {"intent": "debt_gave", "person": "Ali", "amount": 500000, "due_date": "YYYY-MM-DD yoki null"}
 - Qarz olindi: {"intent": "debt_received", "person": "Vali", "amount": 200000, "due_date": "YYYY-MM-DD yoki null"}
 - Daromad: {"intent": "income", "amount": 2000000, "description": "oylik"}
 - Xarajat: {"intent": "expense", "amount": 10000, "description": "taksi"}
 - Hisobot: {"intent": "report"}
 - Qarzlar: {"intent": "debts_list"}
-- Muloqot: {"intent": "ai_reply", "reply": "Matn..."}
-
-Faqat JSON qaytaring.`;
+- Muloqot: {"intent": "ai_reply", "reply": "Matn..."}`;
 
     try {
         if (GROQ_API_KEY) {
@@ -97,7 +110,7 @@ Faqat JSON qaytaring.`;
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    model: "llama3-70b-8192",
+                    model: "llama-3.3-70b-versatile",
                     messages: [{ role: "user", content: prompt }],
                     temperature: 0.1,
                     max_tokens: 250,
@@ -124,11 +137,11 @@ function fallbackRegexParser(text: string) {
 
     // Parse amount
     let amount: number | null = null;
-    const mlnMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:mln|million)/);
+    const mlnMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:mln|million|milon|lem)/);
     if (mlnMatch) amount = parseFloat(mlnMatch[1]) * 1000000;
 
     if (!amount) {
-        const mingMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:ming|k)/);
+        const mingMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:ming|min|k)/);
         if (mingMatch) amount = parseFloat(mingMatch[1]) * 1000;
     }
 
@@ -154,24 +167,26 @@ function fallbackRegexParser(text: string) {
 
     if (amount) {
         // DEBT GAVE: qarz berdim, berdim, qarz berildi, berib turdim
-        if (/qarz ber|berdim|berildi|berib tur/i.test(lower)) {
+        if (/qarz ber|berdim|berudim|berildi|berib tur/i.test(lower)) {
             return { intent: "debt_gave", person, amount, due_date: dueDate };
         }
 
-        // DEBT RECEIVED: qarz oldim, qarz berdi, oldim, olindi
-        if (/qarz ol|oldim|olindi|menga berdi/i.test(lower)) {
+        // DEBT RECEIVED: qarz oldim, qarz berdi, oldim, olindi, oluvdim
+        if (/qarz ol|oldim|oluvdim|olindi|menga berdi/i.test(lower)) {
             return { intent: "debt_received", person, amount, due_date: dueDate };
         }
 
         // INCOME
-        if (/oylik|maosh|zarplata|avans|stipendiya|tushum|ishhaqi|daromad|bonus|freelance|tushdi/i.test(lower)) {
-            const desc = text.replace(/(\d+[\d\s\.]*)\s*(?:ming|k|mln|million|so'm)?/gi, "").replace(/tushdi|oldim|keldi/gi, "").trim();
+        if (/oylik|oyli|maosh|zarplata|avans|stipendiya|tushum|ishhaqi|ish\s*xaqi|daromad|bonus|freelance|tushdi/i.test(lower)) {
+            const desc = text.replace(/(\d+[\d\s\.]*)\s*(?:ming|min|k|mln|million|so'm)?/gi, "").replace(/tushdi|oldim|keldi/gi, "").trim();
             return { intent: "income", amount, description: desc || "oylik" };
         }
 
         // EXPENSE
-        if (/ishlatdim|ketdi|sarfladim|taksi|ovqat|do'kon|bozor|tushlik|xarajat|harajat|to'ladim/i.test(lower)) {
-            const desc = text.replace(/(\d+[\d\s\.]*)\s*(?:ming|k|mln|million|so'm)?/gi, "").replace(/ishlatdim|ketdi|sarfladim|to'ladim/gi, "").trim();
+        if (/ishlatdim|ketdi|sarfladim|taksi|taxi|yolkira|yo'l\s*kira|yol\s*haqqi|ovqat|tushlik|tushli|abed|abet|obed|do'kon|bozor|xarajat|harajat|to'ladim/i.test(lower)) {
+            let desc = text.replace(/(\d+[\d\s\.]*)\s*(?:ming|min|k|mln|million|so'm)?/gi, "").replace(/ishlatdim|ketdi|sarfladim|to'ladim/gi, "").trim();
+            if (/abed|abet|obed|tushli|tushlik/i.test(lower)) desc = "tushlik";
+            if (/yolkira|yo'l\s*kira|yol\s*haqqi|taksi|taxi/i.test(lower)) desc = "taksi";
             return { intent: "expense", amount, description: desc || "xarajat" };
         }
 
@@ -183,7 +198,7 @@ function fallbackRegexParser(text: string) {
 
     return {
         intent: "ai_reply",
-        reply: "🤖 Tushundim! Masalan: <i>Ali ga 500 ming qarz berdim 10 kunga</i> deb yozishingiz mumkin."
+        reply: "🤖 Tushundim! Masalan: <i>Ali ga 500 min qarz berdim 10 kunga</i> deb yozishingiz yoki ovoz yuborishingiz mumkin."
     };
 }
 
@@ -198,8 +213,9 @@ export async function transcribeAudio(fileUrl: string): Promise<string | null> {
 
         const formData = new FormData();
         formData.append("file", audioBlob, "voice.ogg");
-        formData.append("model", "whisper-large-v3");
+        formData.append("model", "whisper-large-v3-turbo");
         formData.append("language", "uz"); // Force target language to Uzbek
+        formData.append("prompt", "O'zbekcha moliyaviy ovozli xabarlar va hisob-kitoblar: 10 ming, 5 min, 100k, oylik, oyli, tushlik, tushli, abed, abet, taksi, yolkira, yo'l haqqi, benzin, metan, so'm, sum, qarz berdim, qarz oldim, Ali, Vali.");
 
         const groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
             method: "POST",
