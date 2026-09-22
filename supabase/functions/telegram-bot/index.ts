@@ -596,7 +596,7 @@ Deno.serve(async (req) => {
             const WEBHOOK_BASE = Deno.env.get("SUPABASE_URL") || "";
 
             const prices: Record<string, { amount: number; title: string }> = {
-                "1_month": { amount: 15000, title: "Hisobla Premium 1 oy" },
+                "1_month": { amount: 1000, title: "Hisobla Premium 1 oy (Sinov)" },
                 "3_months": { amount: 40000, title: "Hisobla Premium 3 oy" },
                 "6_months": { amount: 70000, title: "Hisobla Premium 6 oy" },
                 "1_year": { amount: 130000, title: "Hisobla Premium 1 yil" },
