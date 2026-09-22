@@ -17,6 +17,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS usage_count INT DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS usage_reset_date TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_expires_at TIMESTAMPTZ;
 
 -- Transactions table
 CREATE TABLE IF NOT EXISTS transactions (
@@ -42,11 +43,28 @@ CREATE TABLE IF NOT EXISTS debts (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Payments table (Inpay merchant & other gateways)
+CREATE TABLE IF NOT EXISTS payments (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id BIGINT REFERENCES users(user_id) ON DELETE CASCADE,
+    order_id TEXT NOT NULL UNIQUE,
+    amount NUMERIC(15, 2) NOT NULL,
+    currency TEXT DEFAULT 'UZS',
+    plan TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', -- pending, paid, failed, cancelled
+    inpay_trans_id TEXT,
+    provider TEXT DEFAULT 'inpay',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_debts_user_id ON debts(user_id);
 CREATE INDEX IF NOT EXISTS idx_debts_due_date ON debts(due_date);
+CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
 
 -- Coupons table
 CREATE TABLE IF NOT EXISTS coupons (
@@ -66,10 +84,13 @@ CREATE INDEX IF NOT EXISTS idx_coupons_code ON coupons(code);
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE debts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE coupons ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations
 CREATE POLICY "Allow all for users" ON users FOR ALL USING (true);
 CREATE POLICY "Allow all for transactions" ON transactions FOR ALL USING (true);
 CREATE POLICY "Allow all for debts" ON debts FOR ALL USING (true);
+CREATE POLICY "Allow all for payments" ON payments FOR ALL USING (true);
 CREATE POLICY "Allow all for coupons" ON coupons FOR ALL USING (true);
+

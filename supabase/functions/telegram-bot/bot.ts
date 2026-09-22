@@ -69,6 +69,48 @@ bot.command("qarzlar", async (ctx) => {
     await handleDebtsList(ctx);
 });
 
+// /premium command
+bot.command("premium", async (ctx) => {
+    await handlePremiumInfo(ctx);
+});
+
+async function handlePremiumInfo(ctx: any) {
+    const user = ctx.from!;
+    await ensureUser(user.id, user.username, user.first_name, user.last_name);
+
+    const INPAY_MERCHANT_ID = Deno.env.get("INPAY_MERCHANT_ID") || "12313";
+    const MINI_APP_URL = Deno.env.get("MINI_APP_URL") || "https://umar112507.github.io/hisobla-tg-bot/mini_app/";
+    const webAppUrl = `${MINI_APP_URL}?user_id=${user.id}#tab-premium`;
+
+    // Order IDs for Inpay
+    const now = Date.now();
+    const order1m = `user_${user.id}_1_month_${now}`;
+    const order3m = `user_${user.id}_3_months_${now}`;
+    const order1y = `user_${user.id}_1_year_${now}`;
+
+    // Create checkout links
+    const inpay1m = `https://inpay.uz/pay?merchant_id=${INPAY_MERCHANT_ID}&amount=15000&order_id=${order1m}&title=Hisobla+Premium+1+oy`;
+    const inpay3m = `https://inpay.uz/pay?merchant_id=${INPAY_MERCHANT_ID}&amount=39000&order_id=${order3m}&title=Hisobla+Premium+3+oy`;
+    const inpay1y = `https://inpay.uz/pay?merchant_id=${INPAY_MERCHANT_ID}&amount=99000&order_id=${order1y}&title=Hisobla+Premium+1+yil`;
+
+    const kb = new InlineKeyboard()
+        .url("💳 1 Oylik — 15,000 so'm (Inpay)", inpay1m).row()
+        .url("💳 3 Oylik — 39,000 so'm (Inpay)", inpay3m).row()
+        .url("💳 1 Yillik — 99,000 so'm (Inpay)", inpay1y).row()
+        .webApp("📱 Mini App-da ko'rish", webAppUrl);
+
+    await ctx.reply(
+        `👑 <b>Hisobla AI Premium Tariflari</b>\n\n` +
+        `Premium obunasini Inpay (Uzcard/Humo) orqali xarid qilib, botdan cheksiz foydalanishingiz mumkin:\n\n` +
+        `✨ <b>Cheksiz AI xabarlar</b>\n` +
+        `🎙️ <b>Ovozli xabarlarni aniqlash</b>\n` +
+        `📊 <b>Batafsil moliyaviy hisobotlar</b>\n\n` +
+        `O'zingizga mos tarifni tanlang 👇`,
+        { parse_mode: "HTML", reply_markup: kb }
+    );
+}
+
+
 // EVERY text message is passed to Groq AI + Local Fallback
 bot.on("message:text", async (ctx) => {
     const text = ctx.message.text;

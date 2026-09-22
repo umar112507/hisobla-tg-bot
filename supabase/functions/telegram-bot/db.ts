@@ -278,3 +278,66 @@ export async function checkAndResolveRecentDebtPerson(userId: number, text: stri
     }
     return null;
 }
+
+export async function createPaymentRecord(userId: number, orderId: string, amount: number, plan: string) {
+    const { data, error } = await supabase.from("payments").insert({
+        user_id: userId,
+        order_id: orderId,
+        amount,
+        plan,
+        status: "pending",
+        provider: "inpay",
+    }).select().single();
+    if (error) {
+        console.error("createPaymentRecord error:", error);
+    }
+    return data;
+}
+
+export async function updatePaymentStatus(orderId: string, status: "paid" | "failed" | "cancelled", inpayTransId?: string) {
+    const { data, error } = await supabase.from("payments").update({
+        status,
+        inpay_trans_id: inpayTransId || null,
+        updated_at: new Date().toISOString(),
+    }).eq("order_id", orderId).select().single();
+    if (error) {
+        console.error("updatePaymentStatus error:", error);
+    }
+    return data;
+}
+
+export async function grantUserPremium(userId: number, plan: string) {
+    try {
+        const { data: user } = await supabase.from("users").select("premium_expires_at").eq("user_id", userId).single();
+        let baseDate = new Date();
+        if (user && user.premium_expires_at && new Date(user.premium_expires_at) > baseDate) {
+            baseDate = new Date(user.premium_expires_at);
+        }
+
+        const expiresAt = new Date(baseDate);
+        if (plan === "1_month") {
+            expiresAt.setMonth(expiresAt.getMonth() + 1);
+        } else if (plan === "3_months") {
+            expiresAt.setMonth(expiresAt.getMonth() + 3);
+        } else if (plan === "6_months") {
+            expiresAt.setMonth(expiresAt.getMonth() + 6);
+        } else if (plan === "1_year") {
+            expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+        } else if (plan === "lifetime") {
+            expiresAt.setFullYear(expiresAt.getFullYear() + 100);
+        } else {
+            expiresAt.setMonth(expiresAt.getMonth() + 1);
+        }
+
+        await supabase.from("users").update({
+            is_premium: true,
+            premium_expires_at: expiresAt.toISOString(),
+        }).eq("user_id", userId);
+
+        return expiresAt;
+    } catch (e) {
+        console.error("grantUserPremium error:", e);
+        return null;
+    }
+}
+
