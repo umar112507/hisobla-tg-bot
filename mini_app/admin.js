@@ -1,5 +1,5 @@
 // ─── Config ───────────────────────────────────────────────
-const API_BASE = "https://dyqmawwyooeqadibnpqc.supabase.co/functions/v1/telegram-bot";
+const API_BASE = "https://mbavptwhxjmnomotnbhq.supabase.co/functions/v1/telegram-bot";
 const tg = window.Telegram?.WebApp;
 const params = new URLSearchParams(window.location.search);
 
@@ -104,7 +104,6 @@ function setupNav() {
         item.addEventListener("click", (e) => {
             e.preventDefault();
             goToPage(item.dataset.page);
-            // Close sidebar on mobile
             if (window.innerWidth <= 768) {
                 document.getElementById("sidebar").classList.remove("open");
             }
@@ -135,13 +134,11 @@ function updateKPI(data) {
     animateNum("kpiTxns", data.total_transactions || 0);
     animateNum("kpiCoupons", data.active_coupons || 0);
 
-    // Broadcast info cards
     const free = (data.total_users || 0) - (data.premium_users || 0);
     setEl("bcTotal", data.total_users || 0);
     setEl("bcPremium", data.premium_users || 0);
     setEl("bcFree", free > 0 ? free : 0);
 
-    // Nav badge
     setEl("navBadgeUsers", data.total_users || 0);
 }
 
@@ -164,7 +161,6 @@ function setEl(id, val) {
 
 // ─── Dashboard: Recent Users ──────────────────────────────
 async function loadDashboard() {
-    // Recent users (already in allUsers, or load fresh)
     if (allUsers.length > 0) {
         renderRecentUsers(allUsers.slice(0, 5));
     } else {
@@ -184,19 +180,21 @@ function renderRecentUsers(users) {
     if (!users.length) { el.innerHTML = `<div class="empty-cell">Foydalanuvchilar yo'q</div>`; return; }
 
     el.innerHTML = users.map(u => {
-        const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || "Noma'lum";
+        const uid = u.id || u.user_id;
+        const isPro = u.is_pro || u.is_premium;
+        const name = u.full_name || [u.first_name, u.last_name].filter(Boolean).join(" ") || "Noma'lum";
         const initials = name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-        const color = avatarColor(u.user_id);
-        const badge = u.is_premium
+        const color = avatarColor(uid);
+        const badge = isPro
             ? `<span class="badge badge-premium">👑 Premium</span>`
             : `<span class="badge badge-free">Bepul</span>`;
-        const date = u.created_at ? new Date(u.created_at).toLocaleDateString("uz-UZ") : "—";
+        const date = u.updated_at || u.created_at ? new Date(u.updated_at || u.created_at).toLocaleDateString("uz-UZ") : "—";
         return `
         <div class="recent-row">
           <div class="recent-avatar" style="background:${color}20;color:${color}">${initials}</div>
           <div>
             <div class="recent-name">${escHtml(name)}</div>
-            <div class="recent-meta">${u.username ? "@" + escHtml(u.username) : "#" + u.user_id} · ${date}</div>
+            <div class="recent-meta">${u.username ? "@" + escHtml(u.username) : "#" + String(uid).slice(0, 8)} · ${date}</div>
           </div>
           <div class="recent-status">${badge}</div>
         </div>`;
@@ -236,12 +234,15 @@ function setupUserFilter() {
 function filterUsersData(users, query = "") {
     const q = query.toLowerCase();
     return users.filter(u => {
+        const uid = u.id || u.user_id;
+        const isPro = u.is_pro || u.is_premium;
         const matchFilter =
             userFilter === "all" ||
-            (userFilter === "premium" && u.is_premium) ||
-            (userFilter === "free" && !u.is_premium);
+            (userFilter === "premium" && isPro) ||
+            (userFilter === "free" && !isPro);
         const matchSearch = !q ||
-            String(u.user_id).includes(q) ||
+            String(uid).toLowerCase().includes(q) ||
+            (u.full_name || "").toLowerCase().includes(q) ||
             (u.first_name || "").toLowerCase().includes(q) ||
             (u.last_name || "").toLowerCase().includes(q) ||
             (u.username || "").toLowerCase().includes(q);
@@ -256,19 +257,21 @@ function renderUsers(users) {
         return;
     }
     tbody.innerHTML = users.map(u => {
-        const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || "Noma'lum";
+        const uid = u.id || u.user_id;
+        const isPro = u.is_pro || u.is_premium;
+        const name = u.full_name || [u.first_name, u.last_name].filter(Boolean).join(" ") || "Noma'lum";
         const initials = name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-        const color = avatarColor(u.user_id);
-        const badge = u.is_premium
+        const color = avatarColor(uid);
+        const badge = isPro
             ? `<span class="badge badge-premium">👑 Premium</span>`
             : `<span class="badge badge-free">Bepul</span>`;
         const usage = `${u.usage_count || 0}/10`;
-        const date = u.created_at ? new Date(u.created_at).toLocaleDateString("uz-UZ") : "—";
-        const toggleBtn = u.is_premium
-            ? `<button class="act-btn red" onclick="togglePremium(${u.user_id}, false)">🚫 Bekor</button>`
-            : `<button class="act-btn gold" onclick="togglePremium(${u.user_id}, true)">👑 Premium</button>`;
+        const date = (u.updated_at || u.created_at) ? new Date(u.updated_at || u.created_at).toLocaleDateString("uz-UZ") : "—";
+        const toggleBtn = isPro
+            ? `<button class="act-btn red" onclick="togglePremium('${uid}', false)">🚫 Bekor</button>`
+            : `<button class="act-btn gold" onclick="togglePremium('${uid}', true)">👑 Premium</button>`;
         return `<tr>
-          <td><code style="color:var(--text-muted);font-size:11px">${u.user_id}</code></td>
+          <td><code style="color:var(--text-muted);font-size:11px">${String(uid).slice(0, 8)}...</code></td>
           <td>
             <div style="display:flex;align-items:center;gap:10px">
               <div style="width:30px;height:30px;border-radius:50%;background:${color}20;color:${color};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex-shrink:0">${initials}</div>
@@ -283,8 +286,8 @@ function renderUsers(users) {
           <td><span style="font-size:12px;color:var(--text-muted)">${date}</span></td>
           <td>
             ${toggleBtn}
-            <button class="act-btn green" onclick="resetUsage(${u.user_id})" title="Limitni sifirla">🔄</button>
-            <button class="act-btn info"  onclick="openUserModal(${u.user_id})" title="Batafsil">🔍</button>
+            <button class="act-btn green" onclick="resetUsage('${uid}')" title="Limitni sifirla">🔄</button>
+            <button class="act-btn info"  onclick="openUserModal('${uid}')" title="Batafsil">🔍</button>
           </td>
         </tr>`;
     }).join("");
@@ -324,26 +327,27 @@ async function resetUsage(userId) {
 
 // ─── User Modal ───────────────────────────────────────────
 function openUserModal(userId) {
-    const u = allUsers.find(x => x.user_id === userId);
+    const u = allUsers.find(x => String(x.id || x.user_id) === String(userId));
     if (!u) return;
-    const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || "Noma'lum";
+    const uid = u.id || u.user_id;
+    const isPro = u.is_pro || u.is_premium;
+    const name = u.full_name || [u.first_name, u.last_name].filter(Boolean).join(" ") || "Noma'lum";
     const initials = name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-    const color = avatarColor(u.user_id);
-    const date = u.created_at ? new Date(u.created_at).toLocaleString("uz-UZ") : "—";
+    const color = avatarColor(uid);
+    const date = (u.updated_at || u.created_at) ? new Date(u.updated_at || u.created_at).toLocaleString("uz-UZ") : "—";
 
     document.getElementById("modalTitle").textContent = escHtml(name);
     document.getElementById("modalBody").innerHTML = `
       <div class="modal-avatar" style="background:${color}20;color:${color}">${initials}</div>
-      <div class="modal-row"><span class="modal-row-label">Telegram ID</span><span class="modal-row-value">${u.user_id}</span></div>
+      <div class="modal-row"><span class="modal-row-label">User ID</span><span class="modal-row-value">${uid}</span></div>
       <div class="modal-row"><span class="modal-row-label">Ism</span><span class="modal-row-value">${escHtml(name)}</span></div>
       <div class="modal-row"><span class="modal-row-label">Username</span><span class="modal-row-value">${u.username ? "@" + escHtml(u.username) : "—"}</span></div>
-      <div class="modal-row"><span class="modal-row-label">Holat</span><span class="modal-row-value">${u.is_premium ? "👑 Premium" : "🆓 Bepul"}</span></div>
-      <div class="modal-row"><span class="modal-row-label">Xabarlar ishlatilgan</span><span class="modal-row-value">${u.usage_count || 0} / 10</span></div>
-      <div class="modal-row"><span class="modal-row-label">Ro'yxatdan o'tgan</span><span class="modal-row-value">${date}</span></div>
+      <div class="modal-row"><span class="modal-row-label">Holat</span><span class="modal-row-value">${isPro ? "👑 Premium" : "🆓 Bepul"}</span></div>
+      <div class="modal-row"><span class="modal-row-label">Oxirgi faollik</span><span class="modal-row-value">${date}</span></div>
     `;
-    document.getElementById("modalFooter").innerHTML = u.is_premium
-        ? `<button class="act-btn red" onclick="togglePremium(${u.user_id}, false);closeModal()">🚫 Premiumni bekor qilish</button>`
-        : `<button class="act-btn gold" onclick="togglePremium(${u.user_id}, true);closeModal()">👑 Premium berish</button>`;
+    document.getElementById("modalFooter").innerHTML = isPro
+        ? `<button class="act-btn red" onclick="togglePremium('${uid}', false);closeModal()">🚫 Premiumni bekor qilish</button>`
+        : `<button class="act-btn gold" onclick="togglePremium('${uid}', true);closeModal()">👑 Premium berish</button>`;
     document.getElementById("userModal").classList.remove("hidden");
 }
 
@@ -373,23 +377,25 @@ function renderCoupons(coupons) {
         const now = new Date();
         const expiry = c.expires_at ? new Date(c.expires_at) : null;
         const isExpired = expiry && expiry < now;
-        const isFull = c.used_count >= c.max_uses;
+        const usesLeft = c.uses_left ?? (c.max_uses - (c.used_count || 0));
+        const isFull = usesLeft <= 0;
+        const isActive = c.active ?? c.is_active;
 
         let badge;
-        if (!c.is_active) badge = `<span class="badge badge-inactive">O'chirilgan</span>`;
+        if (!isActive) badge = `<span class="badge badge-inactive">O'chirilgan</span>`;
         else if (isExpired) badge = `<span class="badge badge-expired">Muddati tugagan</span>`;
         else if (isFull) badge = `<span class="badge badge-expired">Limit tugagan</span>`;
         else badge = `<span class="badge badge-active">Faol</span>`;
 
-        const toggleBtn = c.is_active
+        const toggleBtn = isActive
             ? `<button class="act-btn red" onclick="toggleCoupon('${c.id}', false)">🚫</button>`
             : `<button class="act-btn green" onclick="toggleCoupon('${c.id}', true)">✅</button>`;
 
         return `<tr>
           <td><span class="coupon-code">${escHtml(c.code)}</span></td>
-          <td style="font-size:12px">${PLAN_NAMES[c.plan] || c.plan}</td>
+          <td style="font-size:12px">${PLAN_NAMES[c.plan] || c.discount_month + " Oy" || "1 Oy"}</td>
           <td style="font-size:12px; font-weight: 600; color: var(--gold)">${c.discount_percent ?? 100}%</td>
-          <td style="font-size:12px">${c.used_count} / ${c.max_uses}</td>
+          <td style="font-size:12px">${c.uses_left ?? (c.max_uses - (c.used_count || 0))} qoldi</td>
           <td style="font-size:12px;color:var(--text-muted)">${expiry ? expiry.toLocaleDateString("uz-UZ") : "—"}</td>
           <td>${badge}</td>
           <td>${toggleBtn}<button class="act-btn red" onclick="deleteCoupon('${c.id}')">🗑️</button></td>
@@ -520,10 +526,9 @@ function escHtml(str) {
 
 const AVATAR_COLORS = ["#3d8ef8", "#22c55e", "#f5a623", "#a78bfa", "#f87171", "#06b6d4", "#fb923c"];
 function avatarColor(id) {
-    return AVATAR_COLORS[Number(id) % AVATAR_COLORS.length];
+    return AVATAR_COLORS[Math.abs(String(id || "").split("").reduce((a, b) => a + b.charCodeAt(0), 0)) % AVATAR_COLORS.length];
 }
 
-// Close modal on overlay click
 document.getElementById("userModal")?.addEventListener("click", function (e) {
     if (e.target === this) closeModal();
 });

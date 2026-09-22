@@ -178,20 +178,21 @@ function fallbackRegexParser(text: string) {
     if (personMatch) person = personMatch[0];
 
     if (amount) {
+        // INCOME: oylik, maosh, zarplata, avans, stipendiya, tushum, etc.
+        if (/oylik|oyli|maosh|zarplata|avans|stipendiya|tushum|ishhaqi|ish\s*xaqi|daromad|bonus|freelance/i.test(lower)) {
+            let desc = text.replace(/(\d+[\d\s\.]*)\s*(?:ming|min|k|mln|million|so'm)?/gi, "").replace(/tushdi|oldim|keldi|berdi/gi, "").trim();
+            if (!desc) desc = "oylik";
+            return { intent: "income", amount, description: desc };
+        }
+
         // DEBT GAVE: qarz berdim, berdim, qarz berildi, berib turdim
-        if (/qarz ber|berdim|berudim|berildi|berib tur/i.test(lower)) {
+        if (/qarz\s*ber|qarz\s*berdim|berudim|qarz\s*berildi|berib\s*tur/i.test(lower)) {
             return { intent: "debt_gave", person, amount, due_date: dueDate };
         }
 
-        // DEBT RECEIVED: qarz oldim, qarz berdi, oldim, olindi, oluvdim
-        if (/qarz ol|oldim|oluvdim|olindi|menga berdi/i.test(lower)) {
+        // DEBT RECEIVED: qarz oldim, qarz olindi, qarz oluvdim, menga qarz berdi
+        if (/qarz\s*ol|qarz\s*oldim|qarz\s*olindi|qarz\s*oluvdim|menga\s*qarz/i.test(lower)) {
             return { intent: "debt_received", person, amount, due_date: dueDate };
-        }
-
-        // INCOME
-        if (/oylik|oyli|maosh|zarplata|avans|stipendiya|tushum|ishhaqi|ish\s*xaqi|daromad|bonus|freelance|tushdi/i.test(lower)) {
-            const desc = text.replace(/(\d+[\d\s\.]*)\s*(?:ming|min|k|mln|million|so'm)?/gi, "").replace(/tushdi|oldim|keldi/gi, "").trim();
-            return { intent: "income", amount, description: desc || "oylik" };
         }
 
         // EXPENSE

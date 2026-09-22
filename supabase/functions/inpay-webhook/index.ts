@@ -8,7 +8,6 @@ const BOT_TOKEN = Deno.env.get("BOT_TOKEN") || "";
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 serve(async (req: Request) => {
-    // CORS
     if (req.method === "OPTIONS") {
         return new Response("ok", {
             headers: {
@@ -20,7 +19,6 @@ serve(async (req: Request) => {
     }
 
     try {
-        // Inpay sends POST with JSON body
         let payload: any = {};
 
         if (req.method === "POST") {
@@ -44,7 +42,6 @@ serve(async (req: Request) => {
 
         console.log("Inpay webhook received:", JSON.stringify(payload));
 
-        // Inpay webhook fields: amount, status, order_id, transaction_id, created_at
         const orderId = payload.order_id;
         const status = String(payload.status || "").toLowerCase();
         const inpayTransId = String(payload.transaction_id || "");
@@ -57,18 +54,15 @@ serve(async (req: Request) => {
             });
         }
 
-        // Check if payment is successful
         const isPaid = status === "success";
         const isFailed = status === "failed" || status === "cancelled";
 
         if (isFailed) {
-            await supabase.from("payments").update({
-                status: "failed",
-                inpay_trans_id: inpayTransId,
-                updated_at: new Date().toISOString(),
-            }).eq("order_id", orderId);
+            await supabase
+                .from("payments")
+                .update({ status: "failed" })
+                .filter("metadata->>order_id", "eq", orderId);
 
-            // Must return 200 for Inpay
             return new Response("OK", { status: 200 });
         }
 
@@ -77,81 +71,55 @@ serve(async (req: Request) => {
             return new Response("OK", { status: 200 });
         }
 
-        // 1. Fetch payment record from our DB
-        const { data: payment } = await supabase
+        // 1. Fetch payment record from DB
+        const { data: payments } = await supabase
             .from("payments")
             .select("*")
-            .eq("order_id", orderId)
-            .single();
+            .filter("metadata->>order_id", "eq", orderId)
+            .limit(1);
+
+        const payment = payments && payments.length > 0 ? payments[0] : null;
 
         if (!payment) {
             console.error(`Payment record not found for order_id: ${orderId}`);
             return new Response("OK", { status: 200 });
         }
 
-        // Avoid double processing
         if (payment.status === "paid") {
             console.log(`Order ${orderId} already processed`);
             return new Response("OK", { status: 200 });
         }
 
-        const userId = payment.user_id;
-        const plan = payment.plan;
+        const profileId = payment.profile_id;
+        const monthsCount = Number(payment.months || 1);
 
-        // 2. Update payment record
-        await supabase.from("payments").update({
-            status: "paid",
-            inpay_trans_id: inpayTransId,
-            updated_at: new Date().toISOString(),
-        }).eq("order_id", orderId);
+        // 2. Update payment status
+        await supabase
+            .from("payments")
+            .update({ status: "paid" })
+            .eq("id", payment.id);
 
-        // 3. Grant Premium to User
-        const { data: user } = await supabase.from("users").select("premium_expires_at").eq("user_id", userId).single();
+        // 3. Grant PRO to User Profile
+        const { data: profile } = await supabase.from("profiles").select("pro_expires_at").eq("id", profileId).single();
         let baseDate = new Date();
-        if (user && user.premium_expires_at && new Date(user.premium_expires_at) > baseDate) {
-            baseDate = new Date(user.premium_expires_at);
+        if (profile && profile.pro_expires_at && new Date(profile.pro_expires_at) > baseDate) {
+            baseDate = new Date(profile.pro_expires_at);
         }
 
         const expiresAt = new Date(baseDate);
-        let planTitle = "1 Oylik Premium";
-        if (plan === "1_month") {
-            expiresAt.setMonth(expiresAt.getMonth() + 1);
-            planTitle = "1 Oylik Premium";
-        } else if (plan === "3_months") {
-            expiresAt.setMonth(expiresAt.getMonth() + 3);
-            planTitle = "3 Oylik Premium";
-        } else if (plan === "6_months") {
-            expiresAt.setMonth(expiresAt.getMonth() + 6);
-            planTitle = "6 Oylik Premium";
-        } else if (plan === "1_year") {
-            expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-            planTitle = "1 Yillik Premium";
-        } else if (plan === "lifetime") {
-            expiresAt.setFullYear(expiresAt.getFullYear() + 100);
-            planTitle = "Lifetime (Umrbod) Premium";
-        } else {
-            expiresAt.setMonth(expiresAt.getMonth() + 1);
-        }
+        expiresAt.setMonth(expiresAt.getMonth() + monthsCount);
 
-        await supabase.from("users").update({
-            is_premium: true,
-            premium_expires_at: expiresAt.toISOString(),
-        }).eq("user_id", userId);
+        await supabase.from("profiles").update({
+            is_pro: true,
+            pro_expires_at: expiresAt.toISOString(),
+            updated_at: new Date().toISOString(),
+        }).eq("id", profileId);
 
-        // 4. Save to premium history
-        try {
-            await supabase.from("premium_history").insert({
-                user_id: userId,
-                plan: plan,
-                days: Math.round((expiresAt.getTime() - new Date().getTime()) / (1000 * 86400)),
-                expires_at: expiresAt.toISOString(),
-            });
-        } catch (e) {
-            // Premium history table may not exist
-        }
+        // 4. Find telegram_id for Telegram notification
+        const { data: token } = await supabase.from("telegram_auth_tokens").select("telegram_id").eq("user_id", profileId).single();
+        const tgId = token?.telegram_id;
 
-        // 5. Send Telegram notification to user
-        if (BOT_TOKEN) {
+        if (BOT_TOKEN && tgId) {
             const formattedDate = expiresAt.toLocaleDateString("uz-UZ", {
                 year: "numeric",
                 month: "long",
@@ -159,7 +127,7 @@ serve(async (req: Request) => {
             });
 
             const msg = `🎉 <b>To'lovingiz muvaffaqiyatli qabul qilindi!</b>\n\n` +
-                `👑 <b>Tarif:</b> ${planTitle}\n` +
+                `👑 <b>PRO Obuna:</b> ${monthsCount} oy\n` +
                 `💵 <b>Miqdor:</b> ${Number(amount).toLocaleString()} so'm\n` +
                 `📅 <b>Amal qilish muddati:</b> ${formattedDate}\n\n` +
                 `Endi botdan va Mini App-dan cheksiz foydalanishingiz mumkin! 🚀`;
@@ -168,18 +136,16 @@ serve(async (req: Request) => {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    chat_id: userId,
+                    chat_id: tgId,
                     text: msg,
                     parse_mode: "HTML",
                 }),
             }).catch(e => console.error("TG notification error:", e));
         }
 
-        // Must return HTTP 200 for Inpay
         return new Response("OK", { status: 200 });
     } catch (e: any) {
         console.error("Inpay webhook error:", e);
-        // Still return 200 to avoid retries on our bugs
         return new Response("OK", { status: 200 });
     }
 });

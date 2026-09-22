@@ -1,5 +1,5 @@
 // ─── Config ───────────────────────────────────────────────────
-const API_BASE = "https://dyqmawwyooeqadibnpqc.supabase.co/functions/v1/telegram-bot";
+const API_BASE = "https://mbavptwhxjmnomotnbhq.supabase.co/functions/v1/telegram-bot";
 const tg = window.Telegram?.WebApp;
 
 let USER_ID = null;

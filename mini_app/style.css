@@ -59,15 +59,15 @@ body {
 .orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.4;
+  opacity: 0.6;
+  will-change: transform;
   animation: floatOrb 15s ease-in-out infinite alternate;
 }
 
 .orb-1 {
   width: 400px;
   height: 400px;
-  background: rgba(68, 138, 255, 0.15);
+  background: radial-gradient(circle, rgba(68, 138, 255, 0.15) 0%, transparent 70%);
   top: -10%;
   left: -10%;
 }
@@ -75,7 +75,7 @@ body {
 .orb-2 {
   width: 300px;
   height: 300px;
-  background: rgba(0, 230, 118, 0.1);
+  background: radial-gradient(circle, rgba(0, 230, 118, 0.1) 0%, transparent 70%);
   top: 40%;
   right: -10%;
   animation-delay: -5s;
@@ -84,7 +84,7 @@ body {
 .orb-3 {
   width: 350px;
   height: 350px;
-  background: rgba(206, 147, 216, 0.1);
+  background: radial-gradient(circle, rgba(206, 147, 216, 0.1) 0%, transparent 70%);
   bottom: -10%;
   left: 20%;
   animation-delay: -10s;
@@ -110,9 +110,9 @@ body {
   /* Fallback (agar blur ishlamasa) */
   border: var(--glass-border);
   border-radius: var(--radius);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
-  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* ─── Header & Telegram Profile Card ────────────────────────── */
@@ -121,8 +121,9 @@ body {
   top: 0;
   z-index: 100;
   padding: 14px 20px;
-  background: rgba(10, 14, 26, 0.85);
-  backdrop-filter: blur(20px);
+  background: rgba(10, 14, 26, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -1059,8 +1060,8 @@ button,
 }
 
 .pricing-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .pricing-badge {
@@ -1291,9 +1292,9 @@ button,
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(10, 13, 24, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(10, 13, 24, 0.9);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
   z-index: 1000;
   display: flex;
   align-items: flex-end;
