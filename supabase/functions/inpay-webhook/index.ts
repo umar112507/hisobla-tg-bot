@@ -5,13 +5,10 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const BOT_TOKEN = Deno.env.get("BOT_TOKEN") || "";
 
-const INPAY_MERCHANT_ID = Deno.env.get("INPAY_MERCHANT_ID") || "12313";
-const INPAY_MERCHANT_TOKEN = Deno.env.get("INPAY_MERCHANT_TOKEN") || "c6051ee8b0e7eb8b7cfa77349a17afbb";
-
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 serve(async (req: Request) => {
-    // Enable CORS
+    // CORS
     if (req.method === "OPTIONS") {
         return new Response("ok", {
             headers: {
@@ -23,18 +20,13 @@ serve(async (req: Request) => {
     }
 
     try {
+        // Inpay sends POST with JSON body
         let payload: any = {};
-        const url = new URL(req.url);
 
         if (req.method === "POST") {
             const contentType = req.headers.get("content-type") || "";
             if (contentType.includes("application/json")) {
                 payload = await req.json();
-            } else if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
-                const formData = await req.formData();
-                for (const [key, value] of formData.entries()) {
-                    payload[key] = value;
-                }
             } else {
                 const text = await req.text();
                 try {
@@ -44,20 +36,19 @@ serve(async (req: Request) => {
                 }
             }
         } else {
-            // GET query params
+            const url = new URL(req.url);
             for (const [key, value] of url.searchParams.entries()) {
                 payload[key] = value;
             }
         }
 
-        console.log("Inpay webhook received payload:", payload);
+        console.log("Inpay webhook received:", JSON.stringify(payload));
 
-        // Parameters from Inpay callback
-        const orderId = payload.order_id || payload.account || payload.transaction_id || payload.order;
-        const merchantId = String(payload.merchant_id || payload.merchant || "");
-        const status = String(payload.status || payload.state || "").toLowerCase();
-        const inpayTransId = String(payload.inpay_trans_id || payload.id || payload.pay_id || "");
-        const token = payload.merchant_token || payload.token || payload.sign || "";
+        // Inpay webhook fields: amount, status, order_id, transaction_id, created_at
+        const orderId = payload.order_id;
+        const status = String(payload.status || "").toLowerCase();
+        const inpayTransId = String(payload.transaction_id || "");
+        const amount = payload.amount;
 
         if (!orderId) {
             return new Response(JSON.stringify({ error: "Missing order_id" }), {
@@ -66,66 +57,55 @@ serve(async (req: Request) => {
             });
         }
 
-        // Validate merchant ID & token if provided in callback
-        if (merchantId && merchantId !== INPAY_MERCHANT_ID) {
-            console.warn(`Merchant ID mismatch: received ${merchantId}, expected ${INPAY_MERCHANT_ID}`);
-        }
+        // Check if payment is successful
+        const isPaid = status === "success";
+        const isFailed = status === "failed" || status === "cancelled";
 
-        // Determine if payment is successful
-        const isPaid = status === "paid" || status === "success" || status === "1" || status === "completed" || status === "ok";
+        if (isFailed) {
+            await supabase.from("payments").update({
+                status: "failed",
+                inpay_trans_id: inpayTransId,
+                updated_at: new Date().toISOString(),
+            }).eq("order_id", orderId);
+
+            // Must return 200 for Inpay
+            return new Response("OK", { status: 200 });
+        }
 
         if (!isPaid) {
-            console.log(`Payment status for order ${orderId} is not paid: ${status}`);
-            // Update status to failed/cancelled if specified
-            if (status === "failed" || status === "cancelled" || status === "0") {
-                await supabase.from("payments").update({
-                    status: "failed",
-                    updated_at: new Date().toISOString(),
-                }).eq("order_id", orderId);
-            }
-
-            return new Response(JSON.stringify({ status: "acknowledged", order_id: orderId }), {
-                headers: { "Content-Type": "application/json" },
-            });
+            console.log(`Payment status for order ${orderId}: ${status} (not success)`);
+            return new Response("OK", { status: 200 });
         }
 
-        // 1. Fetch payment record
+        // 1. Fetch payment record from our DB
         const { data: payment } = await supabase
             .from("payments")
             .select("*")
             .eq("order_id", orderId)
             .single();
 
-        let userId: number | null = null;
-        let plan = "1_month";
-
-        if (payment) {
-            userId = payment.user_id;
-            plan = payment.plan;
-
-            // Update payment record in database
-            await supabase.from("payments").update({
-                status: "paid",
-                inpay_trans_id: inpayTransId,
-                updated_at: new Date().toISOString(),
-            }).eq("order_id", orderId);
-        } else {
-            // Parse orderId if format is user_{userId}_{plan}_{timestamp}
-            const parts = orderId.split("_");
-            if (parts.length >= 3 && parts[0] === "user") {
-                userId = Number(parts[1]);
-                plan = parts[2];
-            }
+        if (!payment) {
+            console.error(`Payment record not found for order_id: ${orderId}`);
+            return new Response("OK", { status: 200 });
         }
 
-        if (!userId) {
-            return new Response(JSON.stringify({ error: "User not found for order" }), {
-                status: 404,
-                headers: { "Content-Type": "application/json" },
-            });
+        // Avoid double processing
+        if (payment.status === "paid") {
+            console.log(`Order ${orderId} already processed`);
+            return new Response("OK", { status: 200 });
         }
 
-        // 2. Grant Premium to User
+        const userId = payment.user_id;
+        const plan = payment.plan;
+
+        // 2. Update payment record
+        await supabase.from("payments").update({
+            status: "paid",
+            inpay_trans_id: inpayTransId,
+            updated_at: new Date().toISOString(),
+        }).eq("order_id", orderId);
+
+        // 3. Grant Premium to User
         const { data: user } = await supabase.from("users").select("premium_expires_at").eq("user_id", userId).single();
         let baseDate = new Date();
         if (user && user.premium_expires_at && new Date(user.premium_expires_at) > baseDate) {
@@ -158,7 +138,19 @@ serve(async (req: Request) => {
             premium_expires_at: expiresAt.toISOString(),
         }).eq("user_id", userId);
 
-        // 3. Send Telegram notification to user
+        // 4. Save to premium history
+        try {
+            await supabase.from("premium_history").insert({
+                user_id: userId,
+                plan: plan,
+                days: Math.round((expiresAt.getTime() - new Date().getTime()) / (1000 * 86400)),
+                expires_at: expiresAt.toISOString(),
+            });
+        } catch (e) {
+            // Premium history table may not exist
+        }
+
+        // 5. Send Telegram notification to user
         if (BOT_TOKEN) {
             const formattedDate = expiresAt.toLocaleDateString("uz-UZ", {
                 year: "numeric",
@@ -168,8 +160,9 @@ serve(async (req: Request) => {
 
             const msg = `🎉 <b>To'lovingiz muvaffaqiyatli qabul qilindi!</b>\n\n` +
                 `👑 <b>Tarif:</b> ${planTitle}\n` +
+                `💵 <b>Miqdor:</b> ${Number(amount).toLocaleString()} so'm\n` +
                 `📅 <b>Amal qilish muddati:</b> ${formattedDate}\n\n` +
-                `Endi botdan va Mini App-dan cheksiz hamda ovozli xabarlar bilan foydalanishingiz mumkin! 🚀`;
+                `Endi botdan va Mini App-dan cheksiz foydalanishingiz mumkin! 🚀`;
 
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 method: "POST",
@@ -179,17 +172,14 @@ serve(async (req: Request) => {
                     text: msg,
                     parse_mode: "HTML",
                 }),
-            }).catch(e => console.error("Failed to send TG notification:", e));
+            }).catch(e => console.error("TG notification error:", e));
         }
 
-        return new Response(JSON.stringify({ status: "success", order_id: orderId, is_premium: true }), {
-            headers: { "Content-Type": "application/json" },
-        });
+        // Must return HTTP 200 for Inpay
+        return new Response("OK", { status: 200 });
     } catch (e: any) {
         console.error("Inpay webhook error:", e);
-        return new Response(JSON.stringify({ error: e.message }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-        });
+        // Still return 200 to avoid retries on our bugs
+        return new Response("OK", { status: 200 });
     }
 });

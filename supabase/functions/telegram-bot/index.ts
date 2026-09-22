@@ -580,6 +580,92 @@ Deno.serve(async (req) => {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // INPAY PAYMENT API — Server-side invoice creation
+    // ═══════════════════════════════════════════════════════════
+
+    // POST /api/inpay/create-payment
+    if (req.method === "POST" && url.pathname.endsWith("/api/inpay/create-payment")) {
+        try {
+            const body = await req.json();
+            const { user_id, plan } = body;
+            if (!user_id || !plan) return jsonRes({ error: "user_id va plan kerak" }, 400);
+
+            const INPAY_MERCHANT_ID = Deno.env.get("INPAY_MERCHANT_ID") || "12313";
+            const INPAY_MERCHANT_TOKEN = Deno.env.get("INPAY_MERCHANT_TOKEN") || "c6051ee8b0e7eb8b7cfa77349a17afbb";
+            const WEBHOOK_BASE = Deno.env.get("SUPABASE_URL") || "";
+
+            const prices: Record<string, { amount: number; title: string }> = {
+                "1_month": { amount: 15000, title: "Hisobla Premium 1 oy" },
+                "3_months": { amount: 40000, title: "Hisobla Premium 3 oy" },
+                "6_months": { amount: 70000, title: "Hisobla Premium 6 oy" },
+                "1_year": { amount: 130000, title: "Hisobla Premium 1 yil" },
+                "lifetime": { amount: 300000, title: "Hisobla Premium Umrbod" },
+            };
+
+            const planInfo = prices[plan];
+            if (!planInfo) return jsonRes({ error: "Noto'g'ri tarif" }, 400);
+
+            // Step 1: Get Bearer token from Inpay
+            const authRes = await fetch(
+                `https://inpay.uz/api/v1/authorization/?merchant_id=${INPAY_MERCHANT_ID}&merchant_token=${INPAY_MERCHANT_TOKEN}`,
+                { headers: { "Accept": "application/json" } }
+            );
+            const authData = await authRes.json();
+            console.log("Inpay auth response:", authData);
+
+            if (!authData.success || !authData.bearer_token) {
+                return jsonRes({ error: "Inpay autentifikatsiya xatosi", details: authData }, 500);
+            }
+
+            const bearerToken = authData.bearer_token;
+
+            // Step 2: Create payment invoice
+            const callbackUrl = `${WEBHOOK_BASE}/functions/v1/inpay-webhook`;
+
+            const createRes = await fetch("https://inpay.uz/api/v1/create/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${bearerToken}`,
+                },
+                body: JSON.stringify({
+                    merchant_id: INPAY_MERCHANT_ID,
+                    token: INPAY_MERCHANT_TOKEN,
+                    amount: planInfo.amount,
+                    description: `${planInfo.title} — User #${user_id}`,
+                    callback_url: callbackUrl,
+                }),
+            });
+            const createData = await createRes.json();
+            console.log("Inpay create response:", createData);
+
+            if (!createData.success || !createData.pay_url) {
+                return jsonRes({ error: "Inpay to'lov yaratishda xato", details: createData }, 500);
+            }
+
+            // Step 3: Save payment record in our DB
+            const orderId = createData.order_id;
+            await supabase.from("payments").insert({
+                user_id: Number(user_id),
+                order_id: orderId,
+                amount: planInfo.amount,
+                plan: plan,
+                status: "pending",
+                provider: "inpay",
+            });
+
+            return jsonRes({
+                success: true,
+                pay_url: createData.pay_url,
+                order_id: orderId,
+            });
+        } catch (e: any) {
+            console.error("Inpay create-payment error:", e);
+            return jsonRes({ error: "Server xatosi: " + (e.message || "") }, 500);
+        }
+    }
+
     // Telegram Webhook Handler (POST)
     if (req.method === "POST") {
         try {

@@ -79,34 +79,29 @@ async function handlePremiumInfo(ctx: any) {
     await ensureUser(user.id, user.username, user.first_name, user.last_name);
 
     const INPAY_MERCHANT_ID = Deno.env.get("INPAY_MERCHANT_ID") || "12313";
-    const MINI_APP_URL = Deno.env.get("MINI_APP_URL") || "https://umar112507.github.io/hisobla-tg-bot/mini_app/";
-    const webAppUrl = `${MINI_APP_URL}?user_id=${user.id}#tab-premium`;
-
-    // Order IDs for Inpay
-    const now = Date.now();
-    const order1m = `user_${user.id}_1_month_${now}`;
-    const order3m = `user_${user.id}_3_months_${now}`;
-    const order1y = `user_${user.id}_1_year_${now}`;
-
-    // Create checkout links
-    const inpay1m = `https://inpay.uz/pay?merchant_id=${INPAY_MERCHANT_ID}&amount=15000&order_id=${order1m}&title=Hisobla+Premium+1+oy`;
-    const inpay3m = `https://inpay.uz/pay?merchant_id=${INPAY_MERCHANT_ID}&amount=39000&order_id=${order3m}&title=Hisobla+Premium+3+oy`;
-    const inpay1y = `https://inpay.uz/pay?merchant_id=${INPAY_MERCHANT_ID}&amount=99000&order_id=${order1y}&title=Hisobla+Premium+1+yil`;
-
-    const kb = new InlineKeyboard()
-        .url("💳 1 Oylik — 15,000 so'm (Inpay)", inpay1m).row()
-        .url("💳 3 Oylik — 39,000 so'm (Inpay)", inpay3m).row()
-        .url("💳 1 Yillik — 99,000 so'm (Inpay)", inpay1y).row()
-        .webApp("📱 Mini App-da ko'rish", webAppUrl);
+    const INPAY_MERCHANT_TOKEN = Deno.env.get("INPAY_MERCHANT_TOKEN") || "c6051ee8b0e7eb8b7cfa77349a17afbb";
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+    const MINI_APP_URL_ENV = Deno.env.get("MINI_APP_URL") || "https://umar112507.github.io/hisobla-tg-bot/mini_app/";
+    const webAppUrl = `${MINI_APP_URL_ENV}?user_id=${user.id}#tab-premium`;
 
     await ctx.reply(
         `👑 <b>Hisobla AI Premium Tariflari</b>\n\n` +
-        `Premium obunasini Inpay (Uzcard/Humo) orqali xarid qilib, botdan cheksiz foydalanishingiz mumkin:\n\n` +
+        `Premium obunasini Inpay (Uzcard/Humo/Click/Payme) orqali xarid qilib, botdan cheksiz foydalanishingiz mumkin:\n\n` +
         `✨ <b>Cheksiz AI xabarlar</b>\n` +
         `🎙️ <b>Ovozli xabarlarni aniqlash</b>\n` +
         `📊 <b>Batafsil moliyaviy hisobotlar</b>\n\n` +
-        `O'zingizga mos tarifni tanlang 👇`,
-        { parse_mode: "HTML", reply_markup: kb }
+        `💳 Tarif tanlang:\n` +
+        `• 1 Oy — 15,000 so'm\n` +
+        `• 3 Oy — 40,000 so'm\n` +
+        `• 6 Oy — 70,000 so'm\n` +
+        `• 1 Yil — 130,000 so'm\n` +
+        `• Umrbod — 300,000 so'm\n\n` +
+        `📱 To'lov qilish uchun Mini App-ni oching 👇`,
+        {
+            parse_mode: "HTML",
+            reply_markup: new InlineKeyboard()
+                .webApp("💳 Premium Xarid Qilish", webAppUrl)
+        }
     );
 }
 

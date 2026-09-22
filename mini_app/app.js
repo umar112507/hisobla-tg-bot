@@ -637,14 +637,15 @@ function startLiveTicker(expiryIsoStr) {
 async function buyPremium(planId) {
     console.log("buyPremium called for plan:", planId);
 
-    // Fallback USER_ID if not present (e.g. testing in browser)
+    // Fallback USER_ID
     let currentUserId = USER_ID;
     if (!currentUserId) {
         const params = new URLSearchParams(window.location.search);
         currentUserId = params.get("user_id") || params.get("id");
     }
     if (!currentUserId) {
-        currentUserId = 12345678; // Fallback test user ID so button always works
+        showToast("❌ Telegram ID topilmadi. Bot orqali kiring.");
+        return;
     }
 
     if (planId === "test_10s") {
@@ -668,35 +669,43 @@ async function buyPremium(planId) {
         return;
     }
 
-    const prices = {
-        "1_month": { amount: 15000, title: "Hisobla Premium 1 oy" },
-        "3_months": { amount: 40000, title: "Hisobla Premium 3 oy" },
-        "6_months": { amount: 70000, title: "Hisobla Premium 6 oy" },
-        "1_year": { amount: 130000, title: "Hisobla Premium 1 yil" },
-        "lifetime": { amount: 300000, title: "Hisobla Premium Umrbod" }
-    };
-
-    const planInfo = prices[planId] || { amount: 15000, title: "Hisobla Premium" };
-    const INPAY_MERCHANT_ID = "12313";
-    const orderId = `user_${currentUserId}_${planId}_${Date.now()}`;
-    const payUrl = `https://inpay.uz/pay?merchant_id=${INPAY_MERCHANT_ID}&amount=${planInfo.amount}&order_id=${orderId}&title=${encodeURIComponent(planInfo.title)}`;
-
-    showToast("💳 Inpay to'lov sahifasiga o'tilmoqda...");
+    // Call server-side API to create Inpay invoice and get pay_url
+    showToast("💳 To'lov tayyorlanmoqda...");
 
     try {
-        if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openLink === "function") {
-            window.Telegram.WebApp.openLink(payUrl);
+        const res = await fetch(`${API_BASE}/api/inpay/create-payment`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: currentUserId, plan: planId }),
+        });
+        const data = await res.json();
+        console.log("Inpay create-payment response:", data);
+
+        if (data.success && data.pay_url) {
+            showToast("💳 Inpay to'lov sahifasiga o'tilmoqda...");
+            try {
+                if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openLink === "function") {
+                    window.Telegram.WebApp.openLink(data.pay_url);
+                } else {
+                    window.open(data.pay_url, "_blank") || (window.location.href = data.pay_url);
+                }
+            } catch (err) {
+                console.error("Open link error:", err);
+                window.location.href = data.pay_url;
+            }
         } else {
-            window.open(payUrl, "_blank") || (window.location.href = payUrl);
+            showToast(`❌ ${data.error || "To'lov yaratishda xatolik"}`);
+            console.error("Inpay error details:", data.details || data);
         }
-    } catch (err) {
-        console.error("Open link error:", err);
-        window.location.href = payUrl;
+    } catch (e) {
+        console.error("buyPremium fetch error:", e);
+        showToast("❌ Server bilan bog'lanishda xatolik");
     }
 }
 
-// Bind buyPremium globally to ensure window.buyPremium is accessible everywhere
+// Bind buyPremium globally
 window.buyPremium = buyPremium;
+
 
 
 
